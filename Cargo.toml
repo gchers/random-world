@@ -1,0 +1,7 @@
+[package]
+name = "rusty-cp"
+version = "0.1.0"
+authors = ["Giovanni Cherubin <giovanni.cherubin@gmail.com>"]
+
+[dependencies]
+rusty-machine = "0.5.4"
