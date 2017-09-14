@@ -1,5 +1,4 @@
 pub use rusty_machine::linalg::{Matrix, BaseMatrix, Vector};
-pub use rusty_machine::learning::{SupModel, LearningResult};
 
 use ncm::NonConformityScorer;
 
@@ -154,10 +153,19 @@ mod tests {
                                                  2., 2.]);
         let expected_pvalues = Matrix::new(2, 2, vec![0.25, 1.,
                                                       0.25, 1.]);
+        let epsilon_1 = 0.3;
+        let epsilon_2 = 0.2;
+        let expected_preds_1 = Matrix::new(2, 2, vec![false, true,
+                                                      false, true]);
+        let expected_preds_2 = Matrix::new(2, 2, vec![true, true,
+                                                      true, true]);
 
         cp.train(&train_inputs, &train_targets);
         assert!(cp.predict_confidence(&test_inputs).unwrap() == expected_pvalues);
-        cp.predict(&test_inputs);
+        cp.epsilon = Some(epsilon_1);
+        assert!(cp.predict(&test_inputs).unwrap() == expected_preds_1);
+        cp.epsilon = Some(epsilon_2);
+        assert!(cp.predict(&test_inputs).unwrap() == expected_preds_2);
 
     }
 }
