@@ -35,10 +35,10 @@ impl NonConformityScorer<Matrix<f64>> for KNN {
         let input = inputs.get_row(i).expect("Invalid index");
 
         let distances = inputs.iter_rows()
-                                  .enumerate()
-                                  .filter(|&(j, _)| j != i)
-                                  .map(|(_, x)| (self.distance)(x, input))
-                                  .collect::<Vec<_>>();
+                              .enumerate()
+                              .filter(|&(j, _)| j != i)
+                              .map(|(_, x)| (self.distance)(x, input))
+                              .collect::<Vec<_>>();
 
         let k = min(self.k, distances.len());
         let mut k_smallest = vec![f64::INFINITY; k];
