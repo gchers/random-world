@@ -5,7 +5,7 @@ use rusty_machine::linalg::{Matrix, BaseMatrix};
 
 //// Should use
 //// https://athemathmo.github.io/rulinalg/doc/rulinalg/vector/struct.Vector.html#method.metric
-fn euclidean_distance(v1: &[f64], v2: &[f64]) -> f64 {
+fn euclidean_distance(v1: &Vec<f64>, v2: &Vec<f64>) -> f64 {
     let dist: f64 = v1.iter()
                       .zip(v2.iter())
                       .map(|(x,y)| (x - y).powi(2))
@@ -13,28 +13,29 @@ fn euclidean_distance(v1: &[f64], v2: &[f64]) -> f64 {
     dist.sqrt()
 }
 
+/// T: type of a feature object
 pub trait NonConformityScorer<T> {
     /// Compute a k-NN nonconformity score on the i-th input
     /// of inputs given all the rest of inputs.
-    fn score(&self, usize, &T) -> f64;
+    fn score(&self, usize, &[T]) -> f64;
 }
 
-pub struct KNN {
+pub struct KNN<T> {
     k: usize,
-    distance: fn(&[f64], &[f64]) -> f64,
+    distance: fn(&T, &T) -> f64,
 }
 
-impl KNN {
-    pub fn new(k: usize) -> KNN {
+impl KNN<Vec<f64>> {
+    pub fn new(k: usize) -> KNN<Vec<f64>> {
         KNN {k: k, distance: euclidean_distance}
     }
 }
 
-impl NonConformityScorer<Matrix<f64>> for KNN {
-    fn score(&self, i: usize, inputs: &Matrix<f64>) -> f64 {
-        let input = inputs.get_row(i).expect("Invalid index");
+impl<T> NonConformityScorer<T> for KNN<T> {
+    fn score(&self, i: usize, inputs: &[T]) -> f64 {
+        let input = &inputs[i];
 
-        let distances = inputs.iter_rows()
+        let distances = inputs.iter()
                               .enumerate()
                               .filter(|&(j, _)| j != i)
                               .map(|(_, x)| (self.distance)(x, input))
