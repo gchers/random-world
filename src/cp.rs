@@ -1,16 +1,15 @@
 use itertools::Itertools;
-use rusty_machine::linalg::{Matrix, BaseMatrix, Vector};
+use rusty_machine::linalg::{Matrix, BaseMatrix};
 use rusty_machine::learning::LearningResult;
-use std::iter::FromIterator;
 
 use ncm::NonConformityScorer;
 
 
 /// A Confidence Predictor (either transductive or inductive CP)
 trait ConfidencePredictor<T> {
-    fn train(&mut self, inputs: &[T], targets: &[usize]) -> LearningResult<()>;
-    fn predict(&self, inputs: &[T]) -> LearningResult<Matrix<bool>>;
-    fn predict_confidence(&self, inputs: &[T]) -> LearningResult<Matrix<f64>>;
+    fn train(&mut self, inputs: &Vec<T>, targets: &Vec<usize>) -> LearningResult<()>;
+    fn predict(&self, inputs: &Vec<T>) -> LearningResult<Matrix<bool>>;
+    fn predict_confidence(&self, inputs: &Vec<T>) -> LearningResult<Matrix<f64>>;
 }
 
 /// Transductive Conformal Predictor
@@ -39,12 +38,12 @@ impl<T> CP<T> {
     }
 }
 
-impl<T> ConfidencePredictor<T> for CP<T> where T: Clone + FromIterator<T> {
+impl<T> ConfidencePredictor<T> for CP<T> where T: Clone { // + FromIterator<T> {
 
-    fn train(&mut self, inputs: &[T], targets: &[usize])
+    fn train(&mut self, inputs: &Vec<T>, targets: &Vec<usize>)
             -> LearningResult<()> {
-        self.train_inputs = Some(inputs.to_vec());
-        self.train_targets = Some(targets.to_vec());
+        self.train_inputs = Some(inputs.clone());
+        self.train_targets = Some(targets.clone());
         self.n_labels = Some(targets.iter()
                                     .unique()
                                     .count());
@@ -57,7 +56,7 @@ impl<T> ConfidencePredictor<T> for CP<T> where T: Clone + FromIterator<T> {
     /// each value to an input object, and the value is
     /// true if the label conforms the distribution, false
     /// otherwise.
-    fn predict(&self, inputs: &[T]) -> LearningResult<Matrix<bool>> {
+    fn predict(&self, inputs: &Vec<T>) -> LearningResult<Matrix<bool>> {
         let epsilon = self.epsilon.expect("Specify epsilon to perform a standard predict()");
 
         let pvalues = self.predict_confidence(inputs).expect("Failed to predict p-values");
@@ -73,7 +72,7 @@ impl<T> ConfidencePredictor<T> for CP<T> where T: Clone + FromIterator<T> {
 
     /// Returns the p-values corresponding to the labels
     /// for each object provided as input.
-    fn predict_confidence(&self, inputs: &[T]) -> LearningResult<Matrix<f64>> {
+    fn predict_confidence(&self, inputs: &Vec<T>) -> LearningResult<Matrix<f64>> {
 
         let error_msg = "You should train the model first";
         // XXX: try with if let...?
@@ -103,7 +102,7 @@ impl<T> ConfidencePredictor<T> for CP<T> where T: Clone + FromIterator<T> {
                                             .collect::<Vec<T>>();
 
             //train_inputs_l.reserve(1);
-            let n_tmp = train_tmp.len();
+            let n_tmp = train_tmp.len() + 1; /* Count includes 1 test example */
 
             for (i, x) in inputs.iter().enumerate() {
                 /* Temporarily add x to the training data with the
@@ -159,23 +158,21 @@ mod tests {
         let ncm = KNN::new(k);
         let mut cp = CP::new(Box::new(ncm), Some(0.1), false);
 
-        let train_inputs = Vec::new(6, 2, vec![0., 0.,
-                                                  1., 0.,
-                                                  0., 1.,
-                                                  1., 1.,
-                                                  2., 2.,
-                                                  1., 2.]);
-        let train_targets = Vector::new(vec![0, 0, 0, 1, 1, 1]);
-        let test_inputs = Matrix::new(2, 2, vec![2., 1.,
-                                                 2., 2.]);
-        let expected_pvalues = Matrix::new(2, 2, vec![0.25, 1.,
-                                                      0.25, 1.]);
+        let train_inputs = vec![vec![0., 0.],
+                                vec![1., 0.],
+                                vec![0., 1.],
+                                vec![1., 1.],
+                                vec![2., 2.],
+                                vec![1., 2.]];
+        let train_targets = vec![0, 0, 0, 1, 1, 1];
+        let test_inputs = vec![vec![2., 1.],
+                               vec![2., 2.]];
+        let expected_pvalues = Matrix::new(2, 2, vec![0.25, 1., 0.25, 1.]);
+
         let epsilon_1 = 0.3;
         let epsilon_2 = 0.2;
-        let expected_preds_1 = Matrix::new(2, 2, vec![false, true,
-                                                      false, true]);
-        let expected_preds_2 = Matrix::new(2, 2, vec![true, true,
-                                                      true, true]);
+        let expected_preds_1 = Matrix::new(2, 2, vec![false, true, false, true]);
+        let expected_preds_2 = Matrix::new(2, 2, vec![true, true, true, true]);
 
         cp.train(&train_inputs, &train_targets);
         assert!(cp.predict_confidence(&test_inputs).unwrap() == expected_pvalues);
