@@ -28,7 +28,6 @@ pub struct CP<T> {
      * inputs with label y.
      */
     train_inputs: Option<Vec<Vec<T>>>,
-    n_labels: Option<usize>,
 }
 
 impl<T> CP<T> {
@@ -39,7 +38,6 @@ impl<T> CP<T> {
             epsilon: epsilon,
             smooth: smooth,
             train_inputs: None,
-            n_labels: None,
         }
     }
 }
@@ -49,13 +47,13 @@ impl<T> ConfidencePredictor<T> for CP<T> where T: Clone { // + FromIterator<T> {
     fn train(&mut self, inputs: &Vec<T>, targets: &Vec<usize>)
             -> LearningResult<()> {
 
-        let n_labels = targets.iter()
-                              .unique()
-                              .count();
         /* Split examples w.r.t. their labels. For each unique label y,
          * self.train_inputs[y] will contain a vector of the inputs with
          * label y.
          */
+        let n_labels = targets.iter()
+                              .unique()
+                              .count();
         self.train_inputs = Some(inputs.iter()
                                        .zip(targets)
                                        .fold(vec![vec![]; n_labels],
@@ -63,7 +61,6 @@ impl<T> ConfidencePredictor<T> for CP<T> where T: Clone { // + FromIterator<T> {
                                                 res[*y].push(x.clone());
                                                 res
                                              }));
-        self.n_labels = Some(n_labels);
 
         Ok(())
     }
@@ -89,8 +86,10 @@ impl<T> ConfidencePredictor<T> for CP<T> where T: Clone { // + FromIterator<T> {
     fn predict_confidence(&mut self, inputs: &Vec<T>) -> LearningResult<Matrix<f64>> {
 
         let error_msg = "You should train the model first";
-        //let train_inputs = self.train_inputs.as_ref().expect(error_msg);
-        let n_labels = self.n_labels.expect(error_msg);
+
+        let n_labels = self.train_inputs.as_ref()
+                                        .expect(error_msg)
+                                        .len();
 
         let n_test = inputs.len();
 
