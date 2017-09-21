@@ -54,3 +54,26 @@ impl<T> NonConformityScorer<T> for KNN<T> {
                   .sum()
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn knn() {
+        let ncm = KNN::new(2);
+
+        let train_inputs = vec![vec![0., 0.],
+                                vec![1., 0.],
+                                vec![0., 1.],
+                                vec![2., 2.]];
+        let expected_scores = vec![2., 2.414213562373095, 2.414213562373095,
+                                   4.47213595499958];
+
+        for i in 0..4 {
+            println!("{} {} {}", i, ncm.score(i, &train_inputs), expected_scores[i]);
+            assert!(ncm.score(i, &train_inputs) == expected_scores[i]);
+        }
+    }
+}
