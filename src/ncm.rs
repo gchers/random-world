@@ -1,7 +1,5 @@
 use std::f64;
 use std::cmp::min;
-use rusty_machine::linalg::{Matrix, BaseMatrix};
-
 
 //// Should use
 //// https://athemathmo.github.io/rulinalg/doc/rulinalg/vector/struct.Vector.html#method.metric
