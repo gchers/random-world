@@ -1,8 +1,8 @@
 use std::f64;
 use std::cmp::min;
 
-//// Should use
-//// https://athemathmo.github.io/rulinalg/doc/rulinalg/vector/struct.Vector.html#method.metric
+// TODO: Should use
+// https://athemathmo.github.io/rulinalg/doc/rulinalg/vector/struct.Vector.html#method.metric
 fn euclidean_distance(v1: &Vec<f64>, v2: &Vec<f64>) -> f64 {
     let dist: f64 = v1.iter()
                       .zip(v2.iter())
