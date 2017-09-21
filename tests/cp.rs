@@ -1,12 +1,11 @@
-
 extern crate confident;
 extern crate rusty_machine;
 
 #[cfg(test)]
 mod tests {
+    use confident::cp::*;
+    use confident::ncm::*;
     use rusty_machine::linalg::Matrix;
-    use confident::cp::{CP,ConfidencePredictor};
-    use confident::ncm::KNN;
     
     #[test]
     fn cp() {
