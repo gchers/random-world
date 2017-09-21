@@ -29,7 +29,7 @@ mod tests {
         let expected_preds_1 = Matrix::new(2, 2, vec![false, true, false, true]);
         let expected_preds_2 = Matrix::new(2, 2, vec![true, true, true, true]);
 
-        cp.train(&train_inputs, &train_targets);
+        cp.train(&train_inputs, &train_targets).unwrap();
         assert!(cp.predict_confidence(&test_inputs).unwrap() == expected_pvalues);
         cp.set_epsilon(epsilon_1);
         assert!(cp.predict(&test_inputs).unwrap() == expected_preds_1);

@@ -192,7 +192,7 @@ mod tests {
                                          vec![vec![2., 2.],
                                               vec![1., 2.]]];
 
-        cp.train(&train_inputs, &train_targets);
+        cp.train(&train_inputs, &train_targets).unwrap();
 
         assert!(cp.train_inputs.unwrap() == expected_train_inputs);
     }
