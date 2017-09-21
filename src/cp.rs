@@ -173,12 +173,6 @@ mod tests {
     use ncm::KNN;
     
     #[test]
-    fn init() {
-        let ncm = KNN::new(2);
-        let cp = CP::new(Box::new(ncm), Some(0.1), false);
-    }
-
-    #[test]
     fn train() {
         let ncm = KNN::new(2);
         let mut cp = CP::new(Box::new(ncm), Some(0.1), false);
@@ -189,10 +183,17 @@ mod tests {
                                 vec![1., 1.],
                                 vec![2., 2.],
                                 vec![1., 2.]];
-        let train_targets = vec![0, 0, 0, 1, 1, 1];
-        let test_inputs = vec![vec![2., 1.],
-                               vec![2., 2.]];
+        let train_targets = vec![0, 0, 1, 1, 2, 2];
+
+        let expected_train_inputs = vec![vec![vec![0., 0.],
+                                              vec![1., 0.]],
+                                         vec![vec![0., 1.],
+                                              vec![1., 1.]],
+                                         vec![vec![2., 2.],
+                                              vec![1., 2.]]];
 
         cp.train(&train_inputs, &train_targets);
+
+        assert!(cp.train_inputs.unwrap() == expected_train_inputs);
     }
 }
