@@ -8,19 +8,27 @@ use ncm::NonConformityScorer;
 /// A Confidence Predictor (either transductive or inductive CP)
 trait ConfidencePredictor<T> {
     fn train(&mut self, inputs: &Vec<T>, targets: &Vec<usize>) -> LearningResult<()>;
-    fn predict(&self, inputs: &Vec<T>) -> LearningResult<Matrix<bool>>;
-    fn predict_confidence(&self, inputs: &Vec<T>) -> LearningResult<Matrix<f64>>;
+    fn predict(&mut self, inputs: &Vec<T>) -> LearningResult<Matrix<bool>>;
+    fn predict_confidence(&mut self, inputs: &Vec<T>) -> LearningResult<Matrix<f64>>;
+    // TODO:
+    // fn predict_region(&self, pvalues: &Matrix<f64>, epsilon: f64) -> ...
+    // fn update(&self, inputs: &Vec<T>, targets: &Vec<usize>) -> LearningResult<()>;
+
 }
 
 /// Transductive Conformal Predictor
 /// 
-/// T: type of an example (e.g., [f64]).
+/// T: type of an object (e.g., Vec<f64>).
 pub struct CP<T> {
     ncm: Box<NonConformityScorer<T>>,
     epsilon: Option<f64>,
     smooth: bool,
-    train_inputs: Option<Vec<T>>,
-    train_targets: Option<Vec<usize>>,
+    /* Training inputs are stored in a train_inputs, indexed
+     * by a label y, where train_inputs[y] contains all training
+     * inputs with label y.
+     */
+    train_inputs: Option<Vec<Vec<T>>>,
+    //train_targets: Option<Vec<usize>>,
     n_labels: Option<usize>,
 }
 
@@ -32,7 +40,7 @@ impl<T> CP<T> {
             epsilon: epsilon,
             smooth: smooth,
             train_inputs: None,
-            train_targets: None,
+            //train_targets: None,
             n_labels: None,
         }
     }
@@ -42,11 +50,22 @@ impl<T> ConfidencePredictor<T> for CP<T> where T: Clone { // + FromIterator<T> {
 
     fn train(&mut self, inputs: &Vec<T>, targets: &Vec<usize>)
             -> LearningResult<()> {
-        self.train_inputs = Some(inputs.clone());
-        self.train_targets = Some(targets.clone());
-        self.n_labels = Some(targets.iter()
-                                    .unique()
-                                    .count());
+
+        let n_labels = targets.iter()
+                              .unique()
+                              .count();
+        /* Split examples w.r.t. their labels. For each unique label y,
+         * self.train_inputs[y] will contain a vector of the inputs with
+         * label y.
+         */
+        self.train_inputs = Some(inputs.iter()
+                                       .zip(targets)
+                                       .fold(vec![vec![]; n_labels],
+                                             |mut res, (x, y)| {
+                                                res[*y].push(x.clone());
+                                                res
+                                             }));
+        self.n_labels = Some(n_labels);
 
         Ok(())
     }
@@ -56,7 +75,7 @@ impl<T> ConfidencePredictor<T> for CP<T> where T: Clone { // + FromIterator<T> {
     /// each value to an input object, and the value is
     /// true if the label conforms the distribution, false
     /// otherwise.
-    fn predict(&self, inputs: &Vec<T>) -> LearningResult<Matrix<bool>> {
+    fn predict(&mut self, inputs: &Vec<T>) -> LearningResult<Matrix<bool>> {
         let epsilon = self.epsilon.expect("Specify epsilon to perform a standard predict()");
 
         let pvalues = self.predict_confidence(inputs).expect("Failed to predict p-values");
@@ -67,18 +86,12 @@ impl<T> ConfidencePredictor<T> for CP<T> where T: Clone { // + FromIterator<T> {
         Ok(preds)
     }
 
-    // TODO:
-    // fn predict_region(&self, pvalues: &Matrix<f64>, epsilon: f64) -> ...
-
     /// Returns the p-values corresponding to the labels
     /// for each object provided as input.
-    fn predict_confidence(&self, inputs: &Vec<T>) -> LearningResult<Matrix<f64>> {
+    fn predict_confidence(&mut self, inputs: &Vec<T>) -> LearningResult<Matrix<f64>> {
 
         let error_msg = "You should train the model first";
-        // XXX: try with if let...?
         //let train_inputs = self.train_inputs.as_ref().expect(error_msg);
-        let train_inputs = self.train_inputs.as_ref().expect(error_msg);
-        let train_targets = self.train_targets.as_ref().expect(error_msg);
         let n_labels = self.n_labels.expect(error_msg);
 
         let n_test = inputs.len();
@@ -90,55 +103,61 @@ impl<T> ConfidencePredictor<T> for CP<T> where T: Clone { // + FromIterator<T> {
          * examples. This so we only compute train_inputs_l once
          * for each label.
          */
-        for label in 0..n_labels {
-
-            /* Select examples with current label.
-             */
-            // XXX: difference iter() into_iter()
-            let mut train_tmp = train_inputs.into_iter()
-                                            .zip(train_targets.iter())
-                                            .filter(|&(_, y)| *y==label)
-                                            .map(|(x, _)| x.clone())
-                                            .collect::<Vec<T>>();
+        for y in 0..n_labels {
 
             //train_inputs_l.reserve(1);
-            let n_tmp = train_tmp.len() + 1; /* Count includes 1 test example */
+            let n_tmp = self.train_inputs.as_ref()
+                                         .expect(error_msg)[y]
+                                         .len() + 1; /* Count includes 1 test example */
 
             for (i, x) in inputs.iter().enumerate() {
                 /* Temporarily add x to the training data with the
                  * current label.
                  */
-                train_tmp.push(x.clone());
+                {
+                    self.train_inputs.as_mut()
+                                     .expect(error_msg)[y]
+                                     .push(x.clone());
+                }
 
                 /* Compute nonconformity scores.
                  */
-                let scores = (0..n_tmp).into_iter()
-                                       .map(|j| self.ncm.score(j, train_tmp.as_slice()))
-                                       .collect::<Vec<_>>();
+                let scores = {
+                    let train_inputs = self.train_inputs.as_ref()
+                                                        .expect(error_msg)[y]
+                                                        .as_slice();
+                     (0..n_tmp).into_iter()
+                               .map(|j| self.ncm.score(j, train_inputs))
+                               .collect::<Vec<_>>()
+                };
 
                 /* Compute p-value for the current label.
                  */
                 let pvalue = if self.smooth {
-                        unimplemented!();
+                    unimplemented!();
 
-                        let r = 0.1;
-                        let a = scores.iter()
-                                      .filter(|&s| *s > scores[n_tmp-1])
-                                      .count() as f64;
-                        let b = scores.iter()
-                                      .filter(|&s| *s == scores[n_tmp-1])
-                                      .count() as f64;
-                        (a + r*b) / n_tmp as f64
-                    } else {
-                        scores.iter()
-                              .filter(|&s| *s >= scores[n_tmp-1])
-                              .count() as f64 / n_tmp as f64
+                    let r = 0.1;
+                    let a = scores.iter()
+                                  .filter(|&s| *s > scores[n_tmp-1])
+                                  .count() as f64;
+                    let b = scores.iter()
+                                  .filter(|&s| *s == scores[n_tmp-1])
+                                  .count() as f64;
+                    (a + r*b) / n_tmp as f64
+                } else {
+                    scores.iter()
+                          .filter(|&s| *s >= scores[n_tmp-1])
+                          .count() as f64 / n_tmp as f64
                 };
 
-                pvalues[[i,label]] = pvalue;
+                pvalues[[i,y]] = pvalue;
 
-                /* Remove x from data. */
-                train_tmp.pop();
+                /* Remove x from training data. */
+                {
+                    self.train_inputs.as_mut()
+                                     .expect(error_msg)[y]
+                                     .pop();
+                }
             }
         }
 
