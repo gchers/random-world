@@ -1,5 +1,5 @@
 [package]
-name = "rusty-cp"
+name = "confident"
 version = "0.1.0"
 authors = ["Giovanni Cherubin <giovanni.cherubin@gmail.com>"]
 
