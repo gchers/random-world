@@ -28,7 +28,6 @@ pub struct CP<T> {
      * inputs with label y.
      */
     train_inputs: Option<Vec<Vec<T>>>,
-    //train_targets: Option<Vec<usize>>,
     n_labels: Option<usize>,
 }
 
@@ -40,7 +39,6 @@ impl<T> CP<T> {
             epsilon: epsilon,
             smooth: smooth,
             train_inputs: None,
-            //train_targets: None,
             n_labels: None,
         }
     }
@@ -100,8 +98,7 @@ impl<T> ConfidencePredictor<T> for CP<T> where T: Clone { // + FromIterator<T> {
                                       vec![0.0; n_test*n_labels]);
 
         /* We first iterate through labels and then through input
-         * examples. This so we only compute train_inputs_l once
-         * for each label.
+         * examples.
          */
         for y in 0..n_labels {
 
@@ -126,9 +123,9 @@ impl<T> ConfidencePredictor<T> for CP<T> where T: Clone { // + FromIterator<T> {
                     let train_inputs = self.train_inputs.as_ref()
                                                         .expect(error_msg)[y]
                                                         .as_slice();
-                     (0..n_tmp).into_iter()
-                               .map(|j| self.ncm.score(j, train_inputs))
-                               .collect::<Vec<_>>()
+                    (0..n_tmp).into_iter()
+                              .map(|j| self.ncm.score(j, train_inputs))
+                              .collect::<Vec<_>>()
                 };
 
                 /* Compute p-value for the current label.
