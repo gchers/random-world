@@ -6,10 +6,11 @@ use ncm::NonConformityScorer;
 
 
 /// A Confidence Predictor (either transductive or inductive CP)
-trait ConfidencePredictor<T> {
+pub trait ConfidencePredictor<T> {
     fn train(&mut self, inputs: &Vec<T>, targets: &Vec<usize>) -> LearningResult<()>;
     fn predict(&mut self, inputs: &Vec<T>) -> LearningResult<Matrix<bool>>;
     fn predict_confidence(&mut self, inputs: &Vec<T>) -> LearningResult<Matrix<f64>>;
+    fn set_epsilon(&mut self, epsilon: f64);
     // TODO:
     // fn predict_region(&self, pvalues: &Matrix<f64>, epsilon: f64) -> ...
     // fn update(&self, inputs: &Vec<T>, targets: &Vec<usize>) -> LearningResult<()>;
@@ -42,7 +43,11 @@ impl<T> CP<T> {
     }
 }
 
-impl<T> ConfidencePredictor<T> for CP<T> where T: Clone { // + FromIterator<T> {
+impl<T> ConfidencePredictor<T> for CP<T> where T: Clone {
+
+    fn set_epsilon(&mut self, epsilon: f64) {
+        self.epsilon = Some(epsilon);
+    }
 
     fn train(&mut self, inputs: &Vec<T>, targets: &Vec<usize>)
             -> LearningResult<()> {
@@ -168,9 +173,14 @@ mod tests {
     use ncm::KNN;
     
     #[test]
-    fn cp() {
-        let k = 2;
-        let ncm = KNN::new(k);
+    fn init() {
+        let ncm = KNN::new(2);
+        let cp = CP::new(Box::new(ncm), Some(0.1), false);
+    }
+
+    #[test]
+    fn train() {
+        let ncm = KNN::new(2);
         let mut cp = CP::new(Box::new(ncm), Some(0.1), false);
 
         let train_inputs = vec![vec![0., 0.],
@@ -182,19 +192,7 @@ mod tests {
         let train_targets = vec![0, 0, 0, 1, 1, 1];
         let test_inputs = vec![vec![2., 1.],
                                vec![2., 2.]];
-        let expected_pvalues = Matrix::new(2, 2, vec![0.25, 1., 0.25, 1.]);
-
-        let epsilon_1 = 0.3;
-        let epsilon_2 = 0.2;
-        let expected_preds_1 = Matrix::new(2, 2, vec![false, true, false, true]);
-        let expected_preds_2 = Matrix::new(2, 2, vec![true, true, true, true]);
 
         cp.train(&train_inputs, &train_targets);
-        assert!(cp.predict_confidence(&test_inputs).unwrap() == expected_pvalues);
-        cp.epsilon = Some(epsilon_1);
-        assert!(cp.predict(&test_inputs).unwrap() == expected_preds_1);
-        cp.epsilon = Some(epsilon_2);
-        assert!(cp.predict(&test_inputs).unwrap() == expected_preds_2);
-
     }
 }
