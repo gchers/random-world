@@ -11,7 +11,7 @@ mod tests {
     fn cp() {
         let k = 2;
         let ncm = KNN::new(k);
-        let mut cp = CP::new(Box::new(ncm), Some(0.1), false);
+        let mut cp = CP::new(Box::new(ncm), Some(0.1));
 
         let train_inputs = vec![vec![0., 0.],
                                 vec![1., 0.],
@@ -35,5 +35,29 @@ mod tests {
         assert!(cp.predict(&test_inputs).unwrap() == expected_preds_1);
         cp.set_epsilon(epsilon_2);
         assert!(cp.predict(&test_inputs).unwrap() == expected_preds_2);
+    }
+
+    #[test]
+    fn smooth_cp() {
+        let k = 2;
+        let ncm = KNN::new(k);
+        let seed = [0, 0];
+        let mut cp = CP::new_smooth(Box::new(ncm), Some(0.1), Some(seed));
+
+        let train_inputs = vec![vec![0., 0.],
+                                vec![1., 0.],
+                                vec![0., 1.],
+                                vec![1., 1.],
+                                vec![2., 2.],
+                                vec![1., 2.]];
+        let train_targets = vec![0, 0, 0, 1, 1, 1];
+        let test_inputs = vec![vec![2., 1.],
+                               vec![2., 2.]];
+        let expected_pvalues = Matrix::new(2, 2, vec![0., 0.6688798670240814,
+                                                      0.019990972812210628,
+                                                      0.8776580858781683]);
+
+        cp.train(&train_inputs, &train_targets).unwrap();
+        assert!(cp.predict_confidence(&test_inputs).unwrap() == expected_pvalues);
     }
 }
