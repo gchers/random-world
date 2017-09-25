@@ -1,3 +1,5 @@
+use pcg_rand::Pcg32;
+use rand::{Rng, SeedableRng};
 use itertools::Itertools;
 use rusty_machine::linalg::{Matrix, BaseMatrix};
 use rusty_machine::learning::LearningResult;
@@ -24,6 +26,7 @@ pub struct CP<T> {
     ncm: Box<NonConformityScorer<T>>,
     epsilon: Option<f64>,
     smooth: bool,
+    rng: Option<Pcg32>,
     /* Training inputs are stored in a train_inputs, indexed
      * by a label y, where train_inputs[y] contains all training
      * inputs with label y.
@@ -32,13 +35,27 @@ pub struct CP<T> {
 }
 
 impl<T> CP<T> {
-    pub fn new(ncm: Box<NonConformityScorer<T>>, epsilon: Option<f64>, smooth: bool)
-            -> CP<T> {
+    pub fn new(ncm: Box<NonConformityScorer<T>>, epsilon: Option<f64>) -> CP<T> {
         CP {
             ncm: ncm,
             epsilon: epsilon,
-            smooth: smooth,
+            smooth: false,
             train_inputs: None,
+            rng: None,
+        }
+    }
+
+    pub fn new_smooth(ncm: Box<NonConformityScorer<T>>, epsilon: Option<f64>,
+                      seed: Option<[u64; 2]>) -> CP<T> {
+        CP {
+            ncm: ncm,
+            epsilon: epsilon,
+            train_inputs: None,
+            smooth: true,
+            rng: match seed{
+                    Some(seed) => Some(Pcg32::from_seed(seed)),
+                    None => Some(Pcg32::new_unseeded())
+                 },
         }
     }
 }
@@ -135,16 +152,25 @@ impl<T> ConfidencePredictor<T> for CP<T> where T: Clone {
                 /* Compute p-value for the current label.
                  */
                 let pvalue = if self.smooth {
-                    unimplemented!();
 
-                    let r = 0.1;
-                    let a = scores.iter()
-                                  .filter(|&s| *s > scores[n_tmp-1])
-                                  .count() as f64;
-                    let b = scores.iter()
-                                  .filter(|&s| *s == scores[n_tmp-1])
-                                  .count() as f64;
-                    (a + r*b) / n_tmp as f64
+                    /* Generating a random floating point number in [0,1) as
+                     * in:
+                     * http://www.pcg-random.org/using-pcg-c-basic.html
+                     */
+                    let tau = {
+                        self.rng.as_mut()
+                                .expect("Initialize as smooth CP to use")
+                                .gen::<f64>()
+                    };
+
+                    let gt = scores.iter()
+                                   .filter(|&s| *s > scores[n_tmp-1])
+                                   .count() as f64;
+                    let eq = scores.iter()
+                                   .filter(|&s| *s == scores[n_tmp-1])
+                                   .count() as f64;
+
+                    (gt + tau*eq) / n_tmp as f64
                 } else {
                     scores.iter()
                           .filter(|&s| *s >= scores[n_tmp-1])
@@ -172,10 +198,12 @@ mod tests {
     use super::*;
     use ncm::KNN;
     
+    /// Verify that training CP succeeds properly (i.e., it
+    /// correctly splits training inputs per label).
     #[test]
     fn train() {
         let ncm = KNN::new(2);
-        let mut cp = CP::new(Box::new(ncm), Some(0.1), false);
+        let mut cp = CP::new(Box::new(ncm), Some(0.1));
 
         let train_inputs = vec![vec![0., 0.],
                                 vec![1., 0.],
@@ -195,5 +223,25 @@ mod tests {
         cp.train(&train_inputs, &train_targets).unwrap();
 
         assert!(cp.train_inputs.unwrap() == expected_train_inputs);
+    }
+
+    /// Verify that the internal PRNG generates the same sequence
+    /// of numbers when seeded.
+    /// NOTE: if we ever want to change the PRNG, the hardcoded
+    /// values in this function also need to be changed appropriately.
+    #[test]
+    fn rnd_seeded() {
+        let ncm = KNN::new(2);
+        let seed = [0, 0];
+        let mut cp = CP::new_smooth(Box::new(ncm), Some(0.1), Some(seed));
+
+        let r  = cp.rng.as_mut()
+                  .expect("Initialize smooth CP to use")
+                  .gen_iter::<f64>()
+                  .take(5)
+                  .collect::<Vec<_>>();
+
+        assert!(r == vec![0., 0.07996389124884251, 0.6688798670240814,
+                          0.5106323435126732, 0.5024848655054046]);
     }
 }

@@ -4,5 +4,7 @@ version = "0.1.0"
 authors = ["Giovanni Cherubin <giovanni.cherubin@gmail.com>"]
 
 [dependencies]
-rusty-machine = "0.5.4"
+rand = "0.3"
+pcg_rand = "0.7.0"
 itertools = "0.6.2"
+rusty-machine = "0.5.4"
