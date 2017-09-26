@@ -12,13 +12,13 @@ fn euclidean_distance(v1: &Vec<f64>, v2: &Vec<f64>) -> f64 {
 }
 
 /// T: type of a feature object
-pub trait NonConformityScorer<T> {
+pub trait NonConformityScorer<T: Sync> {
     /// Compute a k-NN nonconformity score on the i-th input
     /// of inputs given all the rest of inputs.
     fn score(&self, usize, &[T]) -> f64;
 }
 
-pub struct KNN<T> {
+pub struct KNN<T: Sync> {
     k: usize,
     distance: fn(&T, &T) -> f64,
 }
@@ -29,7 +29,7 @@ impl KNN<Vec<f64>> {
     }
 }
 
-impl<T> NonConformityScorer<T> for KNN<T> {
+impl<T: Sync> NonConformityScorer<T> for KNN<T> {
     fn score(&self, i: usize, inputs: &[T]) -> f64 {
         let input = &inputs[i];
 

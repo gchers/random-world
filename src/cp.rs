@@ -1,3 +1,4 @@
+use rayon::prelude::*;
 use pcg_rand::Pcg32;
 use rand::{Rng, SeedableRng};
 use itertools::Itertools;
@@ -22,8 +23,8 @@ pub trait ConfidencePredictor<T> {
 /// Transductive Conformal Predictor
 /// 
 /// T: type of an object (e.g., Vec<f64>).
-pub struct CP<T> {
-    ncm: Box<NonConformityScorer<T>>,
+pub struct CP<T: Sync, N: Fn(usize, &[T]) -> f64> {
+    ncm: N,
     epsilon: Option<f64>,
     smooth: bool,
     rng: Option<Pcg32>,
@@ -34,8 +35,8 @@ pub struct CP<T> {
     train_inputs: Option<Vec<Vec<T>>>,
 }
 
-impl<T> CP<T> {
-    pub fn new(ncm: Box<NonConformityScorer<T>>, epsilon: Option<f64>) -> CP<T> {
+impl<T: Sync, N: Fn(usize, &[T]) -> f64> CP<T,N> {
+    pub fn new(ncm: N, epsilon: Option<f64>) -> CP<T,N> {
         CP {
             ncm: ncm,
             epsilon: epsilon,
@@ -45,8 +46,8 @@ impl<T> CP<T> {
         }
     }
 
-    pub fn new_smooth(ncm: Box<NonConformityScorer<T>>, epsilon: Option<f64>,
-                      seed: Option<[u64; 2]>) -> CP<T> {
+    pub fn new_smooth(ncm: N, epsilon: Option<f64>,
+                      seed: Option<[u64; 2]>) -> CP<T,N> {
         CP {
             ncm: ncm,
             epsilon: epsilon,
@@ -60,7 +61,8 @@ impl<T> CP<T> {
     }
 }
 
-impl<T> ConfidencePredictor<T> for CP<T> where T: Clone {
+impl<T, N> ConfidencePredictor<T> for CP<T,N>
+        where T: Clone + Sync, N:  Fn(usize, &[T]) -> f64 + Sync {
 
     fn set_epsilon(&mut self, epsilon: f64) {
         self.epsilon = Some(epsilon);
@@ -106,12 +108,13 @@ impl<T> ConfidencePredictor<T> for CP<T> where T: Clone {
     /// Returns the p-values corresponding to the labels
     /// for each object provided as input.
     fn predict_confidence(&mut self, inputs: &Vec<T>) -> LearningResult<Matrix<f64>> {
-
+        let CP { smooth,
+                 ref mut train_inputs, ref ncm, ref mut rng, .. } = *self;
         let error_msg = "You should train the model first";
 
-        let n_labels = self.train_inputs.as_ref()
-                                        .expect(error_msg)
-                                        .len();
+        let n_labels = train_inputs.as_ref()
+                                   .expect(error_msg)
+                                   .len();
 
         let n_test = inputs.len();
 
@@ -124,41 +127,41 @@ impl<T> ConfidencePredictor<T> for CP<T> where T: Clone {
         for y in 0..n_labels {
 
             //train_inputs_l.reserve(1);
-            let n_tmp = self.train_inputs.as_ref()
-                                         .expect(error_msg)[y]
-                                         .len() + 1; /* Count includes 1 test example */
+            let n_tmp = train_inputs.as_ref()
+                                    .expect(error_msg)[y]
+                                    .len() + 1; /* Count includes 1 test example */
 
             for (i, x) in inputs.iter().enumerate() {
                 /* Temporarily add x to the training data with the
                  * current label.
                  */
                 {
-                    self.train_inputs.as_mut()
-                                     .expect(error_msg)[y]
-                                     .push(x.clone());
+                    train_inputs.as_mut()
+                                .expect(error_msg)[y]
+                                .push(x.clone());
                 }
 
                 /* Compute nonconformity scores.
                  */
                 let scores = {
-                    let train_inputs = self.train_inputs.as_ref()
-                                                        .expect(error_msg)[y]
-                                                        .as_slice();
-                    (0..n_tmp).into_iter()
-                              .map(|j| self.ncm.score(j, train_inputs))
+                    let train_inputs = train_inputs.as_ref()
+                                                   .expect(error_msg)[y]
+                                                   .as_slice();
+                    (0..n_tmp).into_par_iter()
+                              .map(|j| ncm(j, train_inputs))
                               .collect::<Vec<_>>()
                 };
 
                 /* Compute p-value for the current label.
                  */
-                let pvalue = if self.smooth {
+                let pvalue = if smooth {
 
                     /* Generating a random floating point number in [0,1) as
                      * in:
                      * http://www.pcg-random.org/using-pcg-c-basic.html
                      */
                     let tau = {
-                        self.rng.as_mut()
+                        rng.as_mut()
                                 .expect("Initialize as smooth CP to use")
                                 .gen::<f64>()
                     };
@@ -181,9 +184,9 @@ impl<T> ConfidencePredictor<T> for CP<T> where T: Clone {
 
                 /* Remove x from training data. */
                 {
-                    self.train_inputs.as_mut()
-                                     .expect(error_msg)[y]
-                                     .pop();
+                    train_inputs.as_mut()
+                                .expect(error_msg)[y]
+                                .pop();
                 }
             }
         }
@@ -191,7 +194,6 @@ impl<T> ConfidencePredictor<T> for CP<T> where T: Clone {
         Ok(pvalues)
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -203,7 +205,7 @@ mod tests {
     #[test]
     fn train() {
         let ncm = KNN::new(2);
-        let mut cp = CP::new(Box::new(ncm), Some(0.1));
+        let mut cp = CP::new(|x, y| ncm.score(x, y), Some(0.1));
 
         let train_inputs = vec![vec![0., 0.],
                                 vec![1., 0.],
@@ -233,7 +235,8 @@ mod tests {
     fn rnd_seeded() {
         let ncm = KNN::new(2);
         let seed = [0, 0];
-        let mut cp = CP::new_smooth(Box::new(ncm), Some(0.1), Some(seed));
+        let mut cp = CP::new_smooth(|x, y| ncm.score(x, y), Some(0.1),
+                                    Some(seed));
 
         let r  = cp.rng.as_mut()
                   .expect("Initialize smooth CP to use")
