@@ -30,7 +30,10 @@ mod tests {
         let expected_preds_2 = Matrix::new(2, 2, vec![true, true, true, true]);
 
         cp.train(&train_inputs, &train_targets).unwrap();
-        assert!(cp.predict_confidence(&test_inputs).unwrap() == expected_pvalues);
+        let pvalues = cp.predict_confidence(&test_inputs).unwrap();
+        println!("Expected p-values: {:?}. P-values: {:?}.", expected_pvalues,
+                 pvalues);
+        assert!(pvalues == expected_pvalues);
         cp.set_epsilon(epsilon_1);
         assert!(cp.predict(&test_inputs).unwrap() == expected_preds_1);
         cp.set_epsilon(epsilon_2);
@@ -56,9 +59,13 @@ mod tests {
                                vec![2., 2.]];
         let expected_pvalues = Matrix::new(2, 2, vec![0., 0.6688798670240814,
                                                       0.019990972812210628,
-                                                      0.8776580858781683]);
+                                                      0.7553161717563366]);
 
         cp.train(&train_inputs, &train_targets).unwrap();
-        assert!(cp.predict_confidence(&test_inputs).unwrap() == expected_pvalues);
+
+        let pvalues = cp.predict_confidence(&test_inputs).unwrap();
+        println!("Expected p-values: {:?}. P-values: {:?}.", expected_pvalues,
+                 pvalues);
+        assert!(pvalues == expected_pvalues);
     }
 }
