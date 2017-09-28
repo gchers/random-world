@@ -78,13 +78,19 @@ impl<T, N> ConfidencePredictor<T> for CP<T,N>
         let n_labels = targets.iter()
                               .unique()
                               .count();
-        self.train_inputs = Some(inputs.iter()
-                                       .zip(targets)
-                                       .fold(vec![vec![]; n_labels],
-                                             |mut res, (x, y)| {
-                                                res[*y].push(x.clone());
-                                                res
-                                             }));
+        let mut train_inputs: Vec<Vec<T>> = vec![vec![]; n_labels];
+
+        for (x, y) in inputs.iter().zip(targets) {
+            train_inputs[*y].push(x.clone());
+        }
+
+        for y in 0..n_labels {
+            train_inputs[y].shrink_to_fit();
+            /* One more space slot will be used in prediction: */
+            train_inputs[y].reserve_exact(1);
+        }
+
+        self.train_inputs = Some(train_inputs);
 
         Ok(())
     }
