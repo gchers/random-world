@@ -1,18 +1,16 @@
-use rayon::prelude::*;
 use pcg_rand::Pcg32;
 use rand::{Rng, SeedableRng};
 use itertools::Itertools;
-use rusty_machine::linalg::{Matrix, BaseMatrix};
 use rusty_machine::learning::LearningResult;
-
-use ncm::NonConformityScorer;
+use ndarray::prelude::*;
+use ndarray::{Axis};
 
 
 /// A Confidence Predictor (either transductive or inductive CP)
 pub trait ConfidencePredictor<T> {
-    fn train(&mut self, inputs: &Vec<T>, targets: &Vec<usize>) -> LearningResult<()>;
-    fn predict(&mut self, inputs: &Vec<T>) -> LearningResult<Matrix<bool>>;
-    fn predict_confidence(&mut self, inputs: &Vec<T>) -> LearningResult<Matrix<f64>>;
+    fn train(&mut self, inputs: &Array2<T>, targets: &Array1<usize>) -> LearningResult<()>;
+    fn predict(&mut self, inputs: &Array2<T>) -> LearningResult<Array2<bool>>;
+    fn predict_confidence(&mut self, inputs: &Array2<T>) -> LearningResult<Array2<f64>>;
     fn set_epsilon(&mut self, epsilon: f64);
     // TODO:
     // fn predict_region(&self, pvalues: &Matrix<f64>, epsilon: f64) -> ...
@@ -23,7 +21,7 @@ pub trait ConfidencePredictor<T> {
 /// Transductive Conformal Predictor
 /// 
 /// T: type of an object (e.g., Vec<f64>).
-pub struct CP<T: Sync, N: Fn(usize, &[T]) -> f64> {
+pub struct CP<T: Sync, N: Fn(usize, &Array2<T>) -> f64> {
     ncm: N,
     epsilon: Option<f64>,
     smooth: bool,
@@ -32,10 +30,10 @@ pub struct CP<T: Sync, N: Fn(usize, &[T]) -> f64> {
      * by a label y, where train_inputs[y] contains all training
      * inputs with label y.
      */
-    train_inputs: Option<Vec<Vec<T>>>,
+    train_inputs: Option<Vec<Array2<T>>>,
 }
 
-impl<T: Sync, N: Fn(usize, &[T]) -> f64> CP<T,N> {
+impl<T: Sync, N: Fn(usize, &Array2<T>) -> f64> CP<T,N> {
     pub fn new(ncm: N, epsilon: Option<f64>) -> CP<T,N> {
         CP {
             ncm: ncm,
@@ -62,35 +60,61 @@ impl<T: Sync, N: Fn(usize, &[T]) -> f64> CP<T,N> {
 }
 
 impl<T, N> ConfidencePredictor<T> for CP<T,N>
-        where T: Clone + Sync, N:  Fn(usize, &[T]) -> f64 + Sync {
+        where T: Clone + Sync + Copy, N:  Fn(usize, &Array2<T>) -> f64 + Sync {
 
     fn set_epsilon(&mut self, epsilon: f64) {
         self.epsilon = Some(epsilon);
     }
 
-    fn train(&mut self, inputs: &Vec<T>, targets: &Vec<usize>)
+    fn train(&mut self, inputs: &Array2<T>, targets: &Array1<usize>)
             -> LearningResult<()> {
 
         /* Split examples w.r.t. their labels. For each unique label y,
-         * self.train_inputs[y] will contain a vector of the inputs with
+         * self.train_inputs[y] will contain a matrix with the inputs with
          * label y.
          */
-        let n_labels = targets.iter()
-                              .unique()
-                              .count();
-        let mut train_inputs: Vec<Vec<T>> = vec![vec![]; n_labels];
+        let mut train_inputs = vec![]; //Vec::with_capacity(n_labels);
 
-        for (x, y) in inputs.iter().zip(targets) {
-            train_inputs[*y].push(x.clone());
+        // TODO: keep track of label ordering, shrink_to_fit()
+        // use .select()?
+        for y in targets.iter().unique() {
+            let inputs_y = inputs.outer_iter()
+                                 .zip(targets)
+                                 .filter(|&(_, _y)| _y== y)
+                                 .flat_map(|(x, _)| x.to_vec())
+                                 .collect::<Vec<_>>();
+
+            let d = inputs.cols();
+            let n = inputs_y.len() / d;
+
+            train_inputs.push(Array::from_shape_vec((n, d), inputs_y).unwrap())
         }
 
-        for y in 0..n_labels {
-            train_inputs[y].shrink_to_fit();
-            /* One more space slot will be used in prediction: */
-            train_inputs[y].reserve_exact(1);
-        }
+        train_inputs.shrink_to_fit();
 
         self.train_inputs = Some(train_inputs);
+
+        //unimplemented!();
+        //let mut train_inputs: Vec<Vec<Vec<T>>> = vec![vec![]; n_labels];
+
+        //let mut train_inputs = [; n_labels];
+
+        // Then in predict:
+        //for train_inputs_y in train_inputs {
+        //    for i...
+        //        ncm(train_inputs_y[i], train_inputs[..i, i+1..]
+
+        //for (x, y) in inputs.iter().zip(targets) {
+        //    train_inputs[*y].push(x.clone());
+        //}
+
+        //for y in 0..n_labels {
+        //    train_inputs[y].shrink_to_fit();
+        //    /* One more space slot will be used in prediction: */
+        //    train_inputs[y].reserve_exact(1);
+        //}
+
+        //self.train_inputs = Some(train_inputs);
 
         Ok(())
     }
@@ -100,56 +124,44 @@ impl<T, N> ConfidencePredictor<T> for CP<T,N>
     /// each value to an input object, and the value is
     /// true if the label conforms the distribution, false
     /// otherwise.
-    fn predict(&mut self, inputs: &Vec<T>) -> LearningResult<Matrix<bool>> {
+    fn predict(&mut self, inputs: &Array2<T>) -> LearningResult<Array2<bool>> {
         let epsilon = self.epsilon.expect("Specify epsilon to perform a standard predict()");
 
         let pvalues = self.predict_confidence(inputs).expect("Failed to predict p-values");
 
-        let preds = Matrix::from_fn(pvalues.rows(), pvalues.cols(),
-                                    |j, i| pvalues[[i,j]] > epsilon);
-        
+        let preds = Array::from_iter(pvalues.iter()
+                                            .map(|p| *p > epsilon))
+                          .into_shape((pvalues.rows(), pvalues.cols()))
+                          .expect("Unexpected error in converting p-values into predictions");
+
         Ok(preds)
     }
 
     /// Returns the p-values corresponding to the labels
     /// for each object provided as input.
-    fn predict_confidence(&mut self, inputs: &Vec<T>) -> LearningResult<Matrix<f64>> {
+    fn predict_confidence(&mut self, inputs: &Array2<T>) -> LearningResult<Array2<f64>> {
         let CP { smooth,
-                 ref mut train_inputs,
+                 ref train_inputs,
                  ref ncm,
                  ref mut rng, .. } = *self;
 
         let error_msg = "You should train the model first";
+        let train_inputs = train_inputs.as_ref()
+                                       .expect(error_msg);
 
-        let n_labels = train_inputs.as_ref()
-                                   .expect(error_msg)
-                                   .len();
+        let mut pvalues = Array2::<f64>::zeros((inputs.rows(), train_inputs.len()));
 
-        let n_test = inputs.len();
+        for (y, train_inputs_y) in train_inputs.into_iter().enumerate() {
 
-        let mut pvalues = Matrix::new(n_test, n_labels,
-                                      vec![0.0; n_test*n_labels]);
+            for (i, test_x) in inputs.outer_iter().enumerate() {
 
-        /* We first iterate through labels and then through input
-         * examples.
-         */
-        for y in 0..n_labels {
-
-            //train_inputs_l.reserve(1);
-            let n_tmp = train_inputs.as_ref()
-                                    .expect(error_msg)[y]
-                                    .len() + 1; /* Count includes 1 test example */
-
-            for (i, x) in inputs.iter().enumerate() {
-                /* Temporarily add x to the training data with the
-                 * current label.
+                /* Temporarily add test_x to training inputs with label y */
+                /* XXX: once ndarray supports appending a row, we should
+                 * append to the matrix rather than creating a new one.
                  */
-                {
-                    train_inputs.as_mut()
-                                .expect(error_msg)[y]
-                                .push(x.clone());
-                }
-
+                let train_inputs_tmp = stack![Axis(0), *train_inputs_y,
+                                              test_x.into_shape((1, inputs.cols()))
+                                                    .unwrap()];
                 /* Compute nonconformity scores.
                  */
                 let tau = match smooth {
@@ -160,37 +172,29 @@ impl<T, N> ConfidencePredictor<T> for CP<T,N>
                 };
 
                 let pvalue = {
-                    let train_inputs = train_inputs.as_ref()
-                                                   .expect(error_msg)[y]
-                                                   .as_slice();
+                    
+                    let n_tmp = train_inputs_tmp.rows();
 
-                    let x_score = ncm(n_tmp-1, train_inputs);
+                    let x_score = ncm(n_tmp-1, &train_inputs_tmp);
 
-                    let (gt, eq) = (0..n_tmp-1).into_iter()
-                                               /* Compute NCMs */
-                                               .map(|j| ncm(j, train_inputs))
-                                               /* Get count of scores > x_score
-                                                * and = x_score.
-                                                */
-                                               .fold((0., 1.), |(gt, eq), s| {
-                                                   match s {
-                                                       _ if s > x_score => (gt+1., eq),
-                                                       _ if s == x_score => (gt, eq+1.),
-                                                       _ => (gt, eq),
-                                                   }
-                                               });
+                    let mut gt = 0.;
+                    let mut eq = 1.;
+                    
+                    for j in 0..n_tmp-1 {
+                        /* Compute NCMs */
+                        let score = ncm(j, &train_inputs_tmp);
 
+                        /* Keep track of greater than and equal */
+                        match () {
+                            _ if score > x_score => gt += 1.,
+                            _ if score == x_score => eq += 1.,
+                            _ => {},
+                        }
+                    };
                     (gt + eq*tau) / (n_tmp as f64)
                 };
-
+            
                 pvalues[[i,y]] = pvalue;
-
-                /* Remove x from training data. */
-                {
-                    train_inputs.as_mut()
-                                .expect(error_msg)[y]
-                                .pop();
-                }
             }
         }
 
@@ -210,20 +214,20 @@ mod tests {
         let ncm = KNN::new(2);
         let mut cp = CP::new(|x, y| ncm.score(x, y), Some(0.1));
 
-        let train_inputs = vec![vec![0., 0.],
-                                vec![1., 0.],
-                                vec![0., 1.],
-                                vec![1., 1.],
-                                vec![2., 2.],
-                                vec![1., 2.]];
-        let train_targets = vec![0, 0, 1, 1, 2, 2];
+        let train_inputs = array![[0., 0.],
+                                  [1., 0.],
+                                  [0., 1.],
+                                  [1., 1.],
+                                  [2., 2.],
+                                  [1., 2.]];
+        let train_targets = array![0, 0, 1, 1, 2, 2];
 
-        let expected_train_inputs = vec![vec![vec![0., 0.],
-                                              vec![1., 0.]],
-                                         vec![vec![0., 1.],
-                                              vec![1., 1.]],
-                                         vec![vec![2., 2.],
-                                              vec![1., 2.]]];
+        let expected_train_inputs = vec![array![[0., 0.],
+                                                [1., 0.]],
+                                         array![[0., 1.],
+                                                [1., 1.]],
+                                         array![[2., 2.],
+                                                [1., 2.]]];
 
         cp.train(&train_inputs, &train_targets).unwrap();
 
