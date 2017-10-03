@@ -1,11 +1,11 @@
 extern crate confident;
-extern crate rusty_machine;
+#[macro_use(array)]
+extern crate ndarray;
 
 #[cfg(test)]
 mod tests {
     use confident::cp::*;
     use confident::ncm::*;
-    use rusty_machine::linalg::Matrix;
     
     #[test]
     fn cp() {
@@ -13,21 +13,24 @@ mod tests {
         let ncm = KNN::new(k);
         let mut cp = CP::new(|x, y| ncm.score(x, y), Some(0.1));
 
-        let train_inputs = vec![vec![0., 0.],
-                                vec![1., 0.],
-                                vec![0., 1.],
-                                vec![1., 1.],
-                                vec![2., 2.],
-                                vec![1., 2.]];
-        let train_targets = vec![0, 0, 0, 1, 1, 1];
-        let test_inputs = vec![vec![2., 1.],
-                               vec![2., 2.]];
-        let expected_pvalues = Matrix::new(2, 2, vec![0.25, 1., 0.25, 1.]);
+        let train_inputs = array![[0., 0.],
+                                  [1., 0.],
+                                  [0., 1.],
+                                  [1., 1.],
+                                  [2., 2.],
+                                  [1., 2.]];
+        let train_targets = array![0, 0, 0, 1, 1, 1];
+        let test_inputs = array![[2., 1.],
+                                 [2., 2.]];
+        let expected_pvalues = array![[0.25, 1.],
+                                      [0.25, 1.]];
 
         let epsilon_1 = 0.3;
         let epsilon_2 = 0.2;
-        let expected_preds_1 = Matrix::new(2, 2, vec![false, true, false, true]);
-        let expected_preds_2 = Matrix::new(2, 2, vec![true, true, true, true]);
+        let expected_preds_1 = array![[false, true],
+                                      [false, true]];
+        let expected_preds_2 = array![[true, true],
+                                      [true, true]];
 
         cp.train(&train_inputs, &train_targets).unwrap();
         let pvalues = cp.predict_confidence(&test_inputs).unwrap();
@@ -48,24 +51,23 @@ mod tests {
         let mut cp = CP::new_smooth(|x, y| ncm.score(x, y), Some(0.1),
                                     Some(seed));
 
-        let train_inputs = vec![vec![0., 0.],
-                                vec![1., 0.],
-                                vec![0., 1.],
-                                vec![1., 1.],
-                                vec![2., 2.],
-                                vec![1., 2.]];
-        let train_targets = vec![0, 0, 0, 1, 1, 1];
-        let test_inputs = vec![vec![2., 1.],
-                               vec![2., 2.]];
-        let expected_pvalues = Matrix::new(2, 2, vec![0., 0.6688798670240814,
-                                                      0.019990972812210628,
-                                                      0.7553161717563366]);
+        let train_inputs = array![[0., 0.],
+                                  [1., 0.],
+                                  [0., 1.],
+                                  [1., 1.],
+                                  [2., 2.],
+                                  [1., 2.]];
+        let train_targets = array![0, 0, 0, 1, 1, 1];
+        let test_inputs = array![[2., 1.],
+                                 [2., 2.]];
+        let expected_pvalues = array![[0., 0.6688798670240814],
+                                      [0.019990972812210628, 0.7553161717563366]];
 
         cp.train(&train_inputs, &train_targets).unwrap();
 
         let pvalues = cp.predict_confidence(&test_inputs).unwrap();
-        println!("Expected p-values: {:?}. P-values: {:?}.", expected_pvalues,
-                 pvalues);
+        println!("Expected p-values: {:?}.", expected_pvalues);
+        println!("Actual p-values: {:?}.", pvalues);
         assert!(pvalues == expected_pvalues);
     }
 }
