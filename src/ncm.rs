@@ -1,37 +1,16 @@
 use std::f64;
 use std::cmp::min;
 use ordered_float::OrderedFloat;
-use lazysort::Sorted;
+use lazysort::SortedBy;
 use ndarray::prelude::*;
+use std::cmp::Ordering::{Greater,Less,Equal};
 
-//cached!{ EUCLIDEAN: UnboundCache >>
-fn cached_euclidean_distance(v: (Vec<OrderedFloat<f64>>, Vec<OrderedFloat<f64>>))
-        -> OrderedFloat<f64> { //= {
-    let (ref v1, ref v2) = v;
-    let dist: f64 = v1.iter()
-                      .zip(v2.iter())
-                      .map(|(x,y)| (x.into_inner() - y.into_inner()).powi(2))
-                      .sum();
-    OrderedFloat::from(dist.sqrt())
-//}}
-}
-
-// TODO: Should use
-// https://athemathmo.github.io/rulinalg/doc/rulinalg/vector/struct.Vector.html#method.metric
 fn euclidean_distance(v1: &ArrayView1<f64>, v2: &ArrayView1<f64>) -> f64 {
-
-    /* Convert into Vec<OrderedFloat<f64>> before calling the
-     * cached function.
-     */
-    let v1o = v1.iter()
-                .map(|x| OrderedFloat::from(x.clone()))
-                .collect::<Vec<_>>();
-
-    let v2o = v2.iter()
-                .map(|x| OrderedFloat::from(x.clone()))
-                .collect::<Vec<_>>();
-
-    cached_euclidean_distance((v1o, v2o)).into_inner()
+    v1.iter()
+      .zip(v2.iter())
+      .map(|(x,y)| (x - y).powi(2))
+      .sum::<f64>()
+      .sqrt()
 }
 
 /// T: type of a feature object
