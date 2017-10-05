@@ -1,9 +1,9 @@
 use std::f64;
 use std::cmp::min;
-use ordered_float::OrderedFloat;
-use lazysort::SortedBy;
 use ndarray::prelude::*;
-use std::cmp::Ordering::{Greater,Less,Equal};
+use std::collections::BinaryHeap;
+use std::iter::FromIterator;
+use ordered_float::OrderedFloat;
 
 fn euclidean_distance(v1: &ArrayView1<f64>, v2: &ArrayView1<f64>) -> f64 {
     v1.iter()
@@ -33,25 +33,34 @@ impl KNN<f64> {
 
 impl<T: Sync> NonConformityScorer<T> for KNN<T> {
     fn score(&self, i: usize, inputs: &Array2<T>) -> f64 {
+        let k = min(self.k, inputs.len()-1);
 
         let ii = i as isize;
-        
         let input = inputs.slice(s![ii..ii+1, ..])
                           .into_shape((inputs.cols()))
                           .expect("Unexpected error in extracting row");
-        let k = min(self.k, inputs.len()-1);
 
-        inputs.outer_iter()
-              .enumerate()
-              .filter(|&(j, _)| j != i)
-              /* Compute distances and convert to OrderedFloat for sorting */
-              .map(|(_, x)| OrderedFloat((self.distance)(&x, &input)))
-              /* Lazy sort: faster because generally k << inputs.len() */
-              .sorted()
-              .take(k)
-              /* Convert back to f64 */
-              .map(|d| d.into_inner())
-              .sum()
+        let mut heap = BinaryHeap::from_iter(inputs.outer_iter()
+                                                   .enumerate()
+                                                   .filter(|&(j, _)| j != i)
+                                                   /* Compute distances */
+                                                   .map(|(_, x)|
+                                                        (self.distance)(&x, &input))
+                                                   /* Need Ord floats to sort.
+                                                    * NOTE: we take the negative
+                                                    * value because we're using
+                                                    * a max heap.
+                                                    */
+                                                   .map(|d| OrderedFloat(-d)));
+        let mut sum = 0.;
+
+        for _ in 0..k {
+            sum -= heap.pop()
+                       .expect("Unexpected error in finding k-smallest")
+                       .0;
+        }
+
+        sum
     }
 }
 
@@ -72,8 +81,11 @@ mod tests {
                                    4.47213595499958];
 
         for i in 0..4 {
-            println!("{} {} {}", i, ncm.score(i, &train_inputs), expected_scores[i]);
-            assert!(ncm.score(i, &train_inputs) == expected_scores[i]);
+            let s = ncm.score(i, &train_inputs);
+            println!("i: {}", i);
+            println!("score: {}", s);
+            println!("expected: {}", expected_scores[i]);
+            assert!(s == expected_scores[i]);
         }
     }
 }
