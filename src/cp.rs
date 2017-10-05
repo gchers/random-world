@@ -96,28 +96,6 @@ impl<T, N> ConfidencePredictor<T> for CP<T,N>
 
         self.train_inputs = Some(train_inputs);
 
-        //unimplemented!();
-        //let mut train_inputs: Vec<Vec<Vec<T>>> = vec![vec![]; n_labels];
-
-        //let mut train_inputs = [; n_labels];
-
-        // Then in predict:
-        //for train_inputs_y in train_inputs {
-        //    for i...
-        //        ncm(train_inputs_y[i], train_inputs[..i, i+1..]
-
-        //for (x, y) in inputs.iter().zip(targets) {
-        //    train_inputs[*y].push(x.clone());
-        //}
-
-        //for y in 0..n_labels {
-        //    train_inputs[y].shrink_to_fit();
-        //    /* One more space slot will be used in prediction: */
-        //    train_inputs[y].reserve_exact(1);
-        //}
-
-        //self.train_inputs = Some(train_inputs);
-
         Ok(())
     }
 
