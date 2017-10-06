@@ -5,7 +5,7 @@ use rusty_machine::learning::LearningResult;
 use ndarray::prelude::*;
 use ndarray::{Axis};
 
-use ncm::NonConformityScorer;
+use ncm::NonconformityScorer;
 
 
 /// A Confidence Predictor (either transductive or inductive CP)

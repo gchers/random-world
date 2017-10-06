@@ -14,7 +14,7 @@ fn euclidean_distance(v1: &ArrayView1<f64>, v2: &ArrayView1<f64>) -> f64 {
 }
 
 /// T: type of a feature object
-pub trait NonConformityScorer<T: Sync> {
+pub trait NonconformityScorer<T: Sync> {
     /// Compute a k-NN nonconformity score on the i-th input
     /// of inputs given all the rest of inputs.
     fn score(&self, i: usize, &Array2<T>) -> f64;
@@ -31,7 +31,7 @@ impl KNN<f64> {
     }
 }
 
-impl<T: Sync> NonConformityScorer<T> for KNN<T> {
+impl<T: Sync> NonconformityScorer<T> for KNN<T> {
     fn score(&self, i: usize, inputs: &Array2<T>) -> f64 {
         let k = min(self.k, inputs.len()-1);
 
