@@ -89,7 +89,8 @@ impl<T, N> ConfidencePredictor<T> for CP<T,N>
             let d = inputs.cols();
             let n = inputs_y.len() / d;
 
-            train_inputs.push(Array::from_shape_vec((n, d), inputs_y).unwrap())
+            train_inputs.push(Array::from_shape_vec((n, d), inputs_y)
+                                    .expect("Unexpected error in reshaping"))
         }
 
         train_inputs.shrink_to_fit();
@@ -125,13 +126,16 @@ impl<T, N> ConfidencePredictor<T> for CP<T,N>
                  ref ncm,
                  ref mut rng, .. } = *self;
 
-        let error_msg = "You should train the model first";
         let train_inputs = train_inputs.as_ref()
-                                       .expect(error_msg);
+                                       .expect("You should train the model first");
 
         let mut pvalues = Array2::<f64>::zeros((inputs.rows(), train_inputs.len()));
 
         for (y, train_inputs_y) in train_inputs.into_iter().enumerate() {
+
+            /* The number accounts of the object we will temporarily append.
+             */
+            let n_tmp = train_inputs_y.rows() + 1;
 
             for (i, test_x) in inputs.outer_iter().enumerate() {
 
@@ -142,38 +146,36 @@ impl<T, N> ConfidencePredictor<T> for CP<T,N>
                 let train_inputs_tmp = stack![Axis(0), *train_inputs_y,
                                               test_x.into_shape((1, inputs.cols()))
                                                     .unwrap()];
-                /* Compute nonconformity scores.
+
+                let x_score = ncm(n_tmp-1, &train_inputs_tmp);
+
+                let mut gt = 0.;
+                let mut eq = 1.;
+
+                for j in 0..n_tmp-1 {
+                    /* Compute nonconformity scores.
+                     */
+                    let score = ncm(j, &train_inputs_tmp);
+
+                    /* Keep track of greater than and equal */
+                    match () {
+                        _ if score > x_score => gt += 1.,
+                        _ if score == x_score => eq += 1.,
+                        _ => {},
+                    }
+                };
+
+                /* Compute p-value.
                  */
-                let tau = match smooth {
-                    true => rng.as_mut()
-                               .expect("Initialize as smooth CP to use")
-                               .gen::<f64>(),
-                    false => 1.
-                };
-
-                let pvalue = {
-                    
-                    let n_tmp = train_inputs_tmp.rows();
-
-                    let x_score = ncm(n_tmp-1, &train_inputs_tmp);
-
-                    let mut gt = 0.;
-                    let mut eq = 1.;
-                    
-                    for j in 0..n_tmp-1 {
-                        /* Compute NCMs */
-                        let score = ncm(j, &train_inputs_tmp);
-
-                        /* Keep track of greater than and equal */
-                        match () {
-                            _ if score > x_score => gt += 1.,
-                            _ if score == x_score => eq += 1.,
-                            _ => {},
-                        }
-                    };
+                let pvalue = if smooth {
+                    let tau = rng.as_mut()
+                                 .expect("Initialize as smooth CP to use")
+                                 .gen::<f64>();
                     (gt + eq*tau) / (n_tmp as f64)
+                } else {
+                    (gt + eq) / (n_tmp as f64)
                 };
-            
+
                 pvalues[[i,y]] = pvalue;
             }
         }
