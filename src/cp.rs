@@ -23,7 +23,7 @@ pub trait ConfidencePredictor<T> {
 /// Transductive Conformal Predictor
 /// 
 /// T: type of an object (e.g., Vec<f64>).
-pub struct CP<T: Sync, N: Fn(usize, &Array2<T>) -> f64> {
+pub struct CP<T: Sync, N: NonconformityScorer<T>> {
     ncm: N,
     epsilon: Option<f64>,
     smooth: bool,
@@ -35,7 +35,7 @@ pub struct CP<T: Sync, N: Fn(usize, &Array2<T>) -> f64> {
     train_inputs: Option<Vec<Array2<T>>>,
 }
 
-impl<T: Sync, N: Fn(usize, &Array2<T>) -> f64> CP<T,N> {
+impl<T: Sync, N: NonconformityScorer<T>> CP<T,N> {
     pub fn new(ncm: N, epsilon: Option<f64>) -> CP<T,N> {
         CP {
             ncm: ncm,
@@ -62,7 +62,7 @@ impl<T: Sync, N: Fn(usize, &Array2<T>) -> f64> CP<T,N> {
 }
 
 impl<T, N> ConfidencePredictor<T> for CP<T,N>
-        where T: Clone + Sync + Copy, N:  Fn(usize, &Array2<T>) -> f64 + Sync {
+        where T: Clone + Sync + Copy, N: NonconformityScorer<T> + Sync {
 
     fn set_epsilon(&mut self, epsilon: f64) {
         self.epsilon = Some(epsilon);
@@ -147,7 +147,7 @@ impl<T, N> ConfidencePredictor<T> for CP<T,N>
                                               test_x.into_shape((1, inputs.cols()))
                                                     .unwrap()];
 
-                let x_score = ncm(n_tmp-1, &train_inputs_tmp);
+                let x_score = ncm.score(n_tmp-1, &train_inputs_tmp);
 
                 let mut gt = 0.;
                 let mut eq = 1.;
@@ -155,7 +155,7 @@ impl<T, N> ConfidencePredictor<T> for CP<T,N>
                 for j in 0..n_tmp-1 {
                     /* Compute nonconformity scores.
                      */
-                    let score = ncm(j, &train_inputs_tmp);
+                    let score = ncm.score(j, &train_inputs_tmp);
 
                     /* Keep track of greater than and equal */
                     match () {
@@ -194,7 +194,7 @@ mod tests {
     #[test]
     fn train() {
         let ncm = KNN::new(2);
-        let mut cp = CP::new(|x, y| ncm.score(x, y), Some(0.1));
+        let mut cp = CP::new(ncm, Some(0.1));
 
         let train_inputs = array![[0., 0.],
                                   [1., 0.],
@@ -224,8 +224,7 @@ mod tests {
     fn rnd_seeded() {
         let ncm = KNN::new(2);
         let seed = [0, 0];
-        let mut cp = CP::new_smooth(|x, y| ncm.score(x, y), Some(0.1),
-                                    Some(seed));
+        let mut cp = CP::new_smooth(ncm, Some(0.1), Some(seed));
 
         let r  = cp.rng.as_mut()
                   .expect("Initialize smooth CP to use")
