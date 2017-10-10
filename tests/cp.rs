@@ -11,7 +11,7 @@ mod tests {
     fn cp() {
         let k = 2;
         let ncm = KNN::new(k);
-        let mut cp = CP::new(|x, y| ncm.score(x, y), Some(0.1));
+        let mut cp = CP::new(ncm, Some(0.1));
 
         let train_inputs = array![[0., 0.],
                                   [1., 0.],
@@ -48,8 +48,7 @@ mod tests {
         let k = 2;
         let ncm = KNN::new(k);
         let seed = [0, 0];
-        let mut cp = CP::new_smooth(|x, y| ncm.score(x, y), Some(0.1),
-                                    Some(seed));
+        let mut cp = CP::new_smooth(ncm, Some(0.1), Some(seed));
 
         let train_inputs = array![[0., 0.],
                                   [1., 0.],
