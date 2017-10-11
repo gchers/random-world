@@ -147,7 +147,7 @@ impl<T, N> ConfidencePredictor<T> for CP<T,N>
                                               test_x.into_shape((1, inputs.cols()))
                                                     .unwrap()];
 
-                let x_score = ncm.score(n_tmp-1, &train_inputs_tmp);
+                let x_score = ncm.score(n_tmp-1, &train_inputs_tmp.view());
 
                 let mut gt = 0.;
                 let mut eq = 1.;
@@ -155,7 +155,7 @@ impl<T, N> ConfidencePredictor<T> for CP<T,N>
                 for j in 0..n_tmp-1 {
                     /* Compute nonconformity scores.
                      */
-                    let score = ncm.score(j, &train_inputs_tmp);
+                    let score = ncm.score(j, &train_inputs_tmp.view());
 
                     /* Keep track of greater than and equal */
                     match () {

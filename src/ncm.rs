@@ -17,7 +17,7 @@ fn euclidean_distance(v1: &ArrayView1<f64>, v2: &ArrayView1<f64>) -> f64 {
 pub trait NonconformityScorer<T: Sync> {
     /// Compute a k-NN nonconformity score on the i-th input
     /// of inputs given all the rest of inputs.
-    fn score(&self, i: usize, &Array2<T>) -> f64;
+    fn score(&self, i: usize, &ArrayView2<T>) -> f64;
 }
 
 pub struct KNN<T: Sync> {
@@ -32,7 +32,7 @@ impl KNN<f64> {
 }
 
 impl<T: Sync> NonconformityScorer<T> for KNN<T> {
-    fn score(&self, i: usize, inputs: &Array2<T>) -> f64 {
+    fn score(&self, i: usize, inputs: &ArrayView2<T>) -> f64 {
         let k = min(self.k, inputs.len()-1);
 
         let ii = i as isize;
@@ -81,7 +81,7 @@ mod tests {
                                    4.47213595499958];
 
         for i in 0..4 {
-            let s = ncm.score(i, &train_inputs);
+            let s = ncm.score(i, &train_inputs.view());
             println!("i: {}", i);
             println!("score: {}", s);
             println!("expected: {}", expected_scores[i]);
