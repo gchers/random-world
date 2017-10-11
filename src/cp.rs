@@ -14,10 +14,6 @@ pub trait ConfidencePredictor<T> {
     fn predict(&mut self, inputs: &Array2<T>) -> LearningResult<Array2<bool>>;
     fn predict_confidence(&mut self, inputs: &Array2<T>) -> LearningResult<Array2<f64>>;
     fn set_epsilon(&mut self, epsilon: f64);
-    // TODO:
-    // fn predict_region(&self, pvalues: &Matrix<f64>, epsilon: f64) -> ...
-    // fn update(&self, inputs: &Vec<T>, targets: &Vec<usize>) -> LearningResult<()>;
-
 }
 
 /// Transductive Conformal Predictor
