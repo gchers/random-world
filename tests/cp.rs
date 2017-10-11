@@ -1,11 +1,12 @@
-extern crate confident;
 #[macro_use(array)]
 extern crate ndarray;
 
+extern crate random_world;
+
 #[cfg(test)]
 mod tests {
-    use confident::cp::*;
-    use confident::ncm::*;
+    use random_world::cp::*;
+    use random_world::ncm::*;
     
     #[test]
     fn cp() {
