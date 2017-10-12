@@ -24,10 +24,9 @@ pub struct CP<T: Sync, N: NonconformityScorer<T>> {
     epsilon: Option<f64>,
     smooth: bool,
     rng: Option<Pcg32>,
-    /* Training inputs are stored in a train_inputs, indexed
-     * by a label y, where train_inputs[y] contains all training
-     * inputs with label y.
-     */
+    // Training inputs are stored in a train_inputs, indexed
+    // by a label y, where train_inputs[y] contains all training
+    // inputs with label y.
     train_inputs: Option<Vec<Array2<T>>>,
 }
 
@@ -170,10 +169,9 @@ impl<T, N> ConfidencePredictor<T> for CP<T,N>
 
         assert!(inputs.rows() == targets.len());
 
-        /* Split examples w.r.t. their labels. For each unique label y,
-         * self.train_inputs[y] will contain a matrix with the inputs with
-         * label y.
-         */
+        // Split examples w.r.t. their labels. For each unique label y,
+        // self.train_inputs[y] will contain a matrix with the inputs with
+        // label y.
         let mut train_inputs = vec![]; //Vec::with_capacity(n_labels);
 
         // TODO: keep track of label ordering, shrink_to_fit()
@@ -310,16 +308,14 @@ impl<T, N> ConfidencePredictor<T> for CP<T,N>
 
         for (y, train_inputs_y) in train_inputs.into_iter().enumerate() {
 
-            /* The number accounts of the object we will temporarily append.
-             */
+            // The number accounts of the object we will temporarily append.
             let n_tmp = train_inputs_y.rows() + 1;
 
             for (i, test_x) in inputs.outer_iter().enumerate() {
 
-                /* Temporarily add test_x to training inputs with label y */
-                /* XXX: once ndarray supports appending a row, we should
-                 * append to the matrix rather than creating a new one.
-                 */
+                // Temporarily add test_x to training inputs with label y.
+                // XXX: once ndarray supports appending a row, we should
+                // append to the matrix rather than creating a new one.
                 let train_inputs_tmp = stack![Axis(0), *train_inputs_y,
                                               test_x.into_shape((1, inputs.cols()))
                                                     .unwrap()];
@@ -330,11 +326,10 @@ impl<T, N> ConfidencePredictor<T> for CP<T,N>
                 let mut eq = 1.;
 
                 for j in 0..n_tmp-1 {
-                    /* Compute nonconformity scores.
-                     */
+                    // Compute nonconformity scores.
                     let score = ncm.score(j, &train_inputs_tmp.view());
 
-                    /* Keep track of greater than and equal */
+                    // Keep track of greater than and equal.
                     match () {
                         _ if score > x_score => gt += 1.,
                         _ if score == x_score => eq += 1.,
@@ -342,8 +337,7 @@ impl<T, N> ConfidencePredictor<T> for CP<T,N>
                     }
                 };
 
-                /* Compute p-value.
-                 */
+                // Compute p-value.
                 let pvalue = if smooth {
                     let tau = rng.as_mut()
                                  .expect("Initialize as smooth CP to use")

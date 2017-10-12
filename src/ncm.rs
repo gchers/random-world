@@ -43,14 +43,13 @@ impl<T: Sync> NonconformityScorer<T> for KNN<T> {
         let mut heap = BinaryHeap::from_iter(inputs.outer_iter()
                                                    .enumerate()
                                                    .filter(|&(j, _)| j != i)
-                                                   /* Compute distances */
+                                                   // Compute distances.
                                                    .map(|(_, x)|
                                                         (self.distance)(&x, &input))
-                                                   /* Need Ord floats to sort.
-                                                    * NOTE: we take the negative
-                                                    * value because we're using
-                                                    * a max heap.
-                                                    */
+                                                   // Need Ord floats to sort.
+                                                   // NOTE: we take the negative
+                                                   // value because we're using
+                                                   // a max heap.
                                                    .map(|d| OrderedFloat(-d)));
         let mut sum = 0.;
 
