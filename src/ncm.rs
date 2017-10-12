@@ -77,15 +77,13 @@ mod tests {
                                   [1., 0.],
                                   [0., 1.],
                                   [2., 2.]];
-        let expected_scores = array![2., 2.414213562373095, 2.414213562373095,
+        let expected_scores = vec![2., 2.414213562373095, 2.414213562373095,
                                    4.47213595499958];
 
-        for i in 0..4 {
-            let s = ncm.score(i, &train_inputs.view());
-            println!("i: {}", i);
-            println!("score: {}", s);
-            println!("expected: {}", expected_scores[i]);
-            assert!(s == expected_scores[i]);
-        }
+        let scores = (0..4).into_iter()
+                           .map(|i| ncm.score(i, &train_inputs.view()))
+                           .collect::<Vec<_>>();
+
+        assert!(scores == expected_scores);
     }
 }
