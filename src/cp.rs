@@ -9,6 +9,9 @@ use ncm::NonconformityScorer;
 
 
 /// A Confidence Predictor (either transductive or inductive CP)
+///
+/// This trait is parametrized over `T`, the element type.
+/// It provides all the methods for making a confidence prediction.
 pub trait ConfidencePredictor<T> {
     fn train(&mut self, inputs: &Array2<T>, targets: &Array1<usize>) -> LearningResult<()>;
     fn predict(&mut self, inputs: &Array2<T>) -> LearningResult<Array2<bool>>;
@@ -16,9 +19,6 @@ pub trait ConfidencePredictor<T> {
     fn set_epsilon(&mut self, epsilon: f64);
 }
 
-/// Transductive Conformal Predictor
-/// 
-/// T: type of an object (e.g., Vec<f64>).
 pub struct CP<T: Sync, N: NonconformityScorer<T>> {
     ncm: N,
     epsilon: Option<f64>,
@@ -32,7 +32,30 @@ pub struct CP<T: Sync, N: NonconformityScorer<T>> {
 }
 
 impl<T: Sync, N: NonconformityScorer<T>> CP<T,N> {
+    /// Constructs a new deterministic Transductive Conformal Predictor
+    /// `CP<T,N>` from a nonconformity score NonconformityScorer.
+    ///
+    /// # Arguments
+    ///
+    /// * `ncm` - an object implementing NonconformityScorer.
+    /// * `epsilon` - Either Some() significance level in [0,1] or None.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use random_world::cp::*;
+    /// use random_world::ncm::*;
+    ///
+    /// let ncm = KNN::new(2);
+    /// let epsilon = 0.1;
+    /// let mut cp = CP::new(ncm, Some(epsilon));
+    /// ```
     pub fn new(ncm: N, epsilon: Option<f64>) -> CP<T,N> {
+
+        if let Some(e) = epsilon {
+            assert!(e >= 0. && e <= 1.);
+        }
+
         CP {
             ncm: ncm,
             epsilon: epsilon,
@@ -42,8 +65,34 @@ impl<T: Sync, N: NonconformityScorer<T>> CP<T,N> {
         }
     }
 
+    /// Constructs a new smooth Transductive Conformal Predictor
+    /// `CP<T,N>` from a nonconformity score NonconformityScorer.
+    ///
+    /// # Arguments
+    ///
+    /// * `ncm` - an object implementing NonconformityScorer.
+    /// * `epsilon` - Either Some() significance level in [0,1] or None.
+    /// * `seed` - Optionally, a slice of 2 elements is provided as seed
+    ///            to the random number generator.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use random_world::cp::*;
+    /// use random_world::ncm::*;
+    ///
+    /// let ncm = KNN::new(2);
+    /// let epsilon = 0.1;
+    /// let seed = [0, 0];
+    /// let mut cp = CP::new_smooth(ncm, Some(epsilon), Some(seed));
+    /// ```
     pub fn new_smooth(ncm: N, epsilon: Option<f64>,
                       seed: Option<[u64; 2]>) -> CP<T,N> {
+
+        if let Some(e) = epsilon {
+            assert!(e >= 0. && e <= 1.);
+        }
+
         CP {
             ncm: ncm,
             epsilon: epsilon,
@@ -60,12 +109,66 @@ impl<T: Sync, N: NonconformityScorer<T>> CP<T,N> {
 impl<T, N> ConfidencePredictor<T> for CP<T,N>
         where T: Clone + Sync + Copy, N: NonconformityScorer<T> + Sync {
 
+    /// Sets the significance level.
+    ///
+    /// # Arguments
+    ///
+    /// * `epsilon` - Significance level in [0,1].
     fn set_epsilon(&mut self, epsilon: f64) {
+        assert!(epsilon >= 0. && epsilon <= 1.);
+
         self.epsilon = Some(epsilon);
     }
 
+    /// Trains a Conformal Predictor on a training set.
+    ///
+    /// Pedantic note: because CP is a transductive method, it never
+    /// actually trains a model.
+    /// This function, however, structures the training data so that
+    /// it can be easily used in the prediction phase.
+    ///
+    /// # Arguments
+    ///
+    /// * `inputs` - Matrix (Array2<T>) with values of type T of training
+    ///              vectors.
+    /// * `targets` - Vector (Array1<T>) of labels corresponding to the
+    ///               training vectors.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// #[macro_use(array)]
+    /// extern crate ndarray;
+    /// extern crate random_world;
+    ///
+    /// # fn main() {
+    /// use random_world::cp::*;
+    /// use random_world::ncm::*;
+    ///
+    /// // Train a CP
+    /// let ncm = KNN::new(2);
+    /// let mut cp = CP::new(ncm, Some(0.1));
+    /// let train_inputs = array![[0., 0.],
+    ///                           [1., 0.],
+    ///                           [0., 1.],
+    ///                           [1., 1.],
+    ///                           [2., 2.],
+    ///                           [1., 2.]];
+    /// let train_targets = array![0, 0, 1, 1, 2, 2];
+    ///
+    /// cp.train(&train_inputs, &train_targets)
+    ///   .expect("Failed to train model");
+    /// # }
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics if the number of training examples is not consistent
+    /// with the number of respective labels.
     fn train(&mut self, inputs: &Array2<T>, targets: &Array1<usize>)
             -> LearningResult<()> {
+
+        assert!(inputs.rows() == targets.len());
 
         /* Split examples w.r.t. their labels. For each unique label y,
          * self.train_inputs[y] will contain a matrix with the inputs with
@@ -96,11 +199,49 @@ impl<T, N> ConfidencePredictor<T> for CP<T,N>
         Ok(())
     }
 
-    /// Returns a region prediction as a matrix of boolean
-    /// values, where each column corresponds to a label,
-    /// each value to an input object, and the value is
-    /// true if the label conforms the distribution, false
-    /// otherwise.
+    /// Returns candidate labels (region prediction) for test vectors.
+    ///
+    /// The return value is a matrix of `bool` (`Array2<bool>`) with shape
+    /// `(n_inputs, n_labels)`, where `n_inputs = inputs.rows()` and
+    /// `n_labels` is the number of possible labels;
+    /// in such matrix, each column `y` corresponds to a label,
+    /// each row `i` to an input object, and the value at `[i,y]` is
+    /// true if the label conforms the distribution, false otherwise.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// #[macro_use(array)]
+    /// extern crate ndarray;
+    /// extern crate random_world;
+    ///
+    /// # fn main() {
+    /// use random_world::cp::*;
+    /// use random_world::ncm::*;
+    ///
+    /// // Construct a deterministic CP with k-NN nonconformity measure (k=2).
+    /// let ncm = KNN::new(2);
+    /// let mut cp = CP::new(ncm, Some(0.3));
+    /// let train_inputs = array![[0., 0.],
+    ///                           [1., 0.],
+    ///                           [0., 1.],
+    ///                           [1., 1.],
+    ///                           [2., 2.],
+    ///                           [1., 2.]];
+    /// let train_targets = array![0, 0, 0, 1, 1, 1];
+    /// let test_inputs = array![[2., 1.],
+    ///                          [2., 2.]];
+    ///
+    /// // Train and predict
+    /// cp.train(&train_inputs, &train_targets)
+    ///   .expect("Failed prediction");
+    /// let preds = cp.predict(&test_inputs)
+    ///               .expect("Failed to predict");
+    /// assert!(preds == array![[false, true],
+    ///                         [false, true]]);
+    /// # }
+    /// ```
+    /// */
     fn predict(&mut self, inputs: &Array2<T>) -> LearningResult<Array2<bool>> {
         let epsilon = self.epsilon.expect("Specify epsilon to perform a standard predict()");
 
@@ -114,8 +255,48 @@ impl<T, N> ConfidencePredictor<T> for CP<T,N>
         Ok(preds)
     }
 
-    /// Returns the p-values corresponding to the labels
-    /// for each object provided as input.
+    /// Returns the p-values for test vectors.
+    ///
+    /// The return value is a matrix of `f64` (`Array2<f64>`) with shape
+    /// `(n_inputs, n_labels)`, where `n_inputs = inputs.rows()` and
+    /// `n_labels` is the number of possible labels;
+    /// in such matrix, each column `y` corresponds to a label,
+    /// each row `i` to an input object, and the value at `[i,y]` is
+    /// the p-value obtained when assuming `y` as a label for the
+    /// `i`-th input object.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// #[macro_use(array)]
+    /// extern crate ndarray;
+    /// extern crate random_world;
+    ///
+    /// # fn main() {
+    /// use random_world::cp::*;
+    /// use random_world::ncm::*;
+    ///
+    /// // Construct a deterministic CP with k-NN nonconformity measure (k=2).
+    /// let ncm = KNN::new(2);
+    /// let mut cp = CP::new(ncm, Some(0.1));
+    /// let train_inputs = array![[0., 0.],
+    ///                           [1., 0.],
+    ///                           [0., 1.],
+    ///                           [1., 1.],
+    ///                           [2., 2.],
+    ///                           [1., 2.]];
+    /// let train_targets = array![0, 0, 0, 1, 1, 1];
+    /// let test_inputs = array![[2., 1.],
+    ///                          [2., 2.]];
+    ///
+    /// // Train and predict p-values
+    /// cp.train(&train_inputs, &train_targets).unwrap();
+    /// let pvalues = cp.predict_confidence(&test_inputs)
+    ///                 .expect("Failed prediction");
+    /// assert!(pvalues == array![[0.25, 1.],
+    ///                           [0.25, 1.]]);
+    /// }
+    /// ```
     fn predict_confidence(&mut self, inputs: &Array2<T>) -> LearningResult<Array2<f64>> {
         let CP { smooth,
                  ref train_inputs,
