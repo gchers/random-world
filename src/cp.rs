@@ -19,6 +19,19 @@ pub trait ConfidencePredictor<T> {
     fn set_epsilon(&mut self, epsilon: f64);
 }
 
+/// A Conformal Predictor, for some nonconformity scorer N and
+/// matrix element type T.
+///
+/// CP can either be deterministic, where `smooth=false` and `rng=None`,
+/// or smooth, where `smooth=true` and rng is some pseudo random number
+/// generator (PRNG).
+/// Let `Y` be a list of values ("prediction region") predicted by a CP
+/// for a test input vector `x` with true label `y`.
+/// If CP is constructed as deterministic, then:
+/// $Pr(y \notin Y) \leq \varepsilon$, where $\varepsilon$ is the specified
+/// significance level `epsilon`;
+/// if CP is smooth, then:
+/// $Pr(y \notin Y) = \varepsilon$.
 pub struct CP<T: Sync, N: NonconformityScorer<T>> {
     ncm: N,
     epsilon: Option<f64>,
@@ -36,7 +49,7 @@ impl<T: Sync, N: NonconformityScorer<T>> CP<T,N> {
     ///
     /// # Arguments
     ///
-    /// * `ncm` - an object implementing NonconformityScorer.
+    /// * `ncm` - An object implementing NonconformityScorer.
     /// * `epsilon` - Either Some() significance level in [0,1] or None.
     ///
     /// # Examples
@@ -69,7 +82,7 @@ impl<T: Sync, N: NonconformityScorer<T>> CP<T,N> {
     ///
     /// # Arguments
     ///
-    /// * `ncm` - an object implementing NonconformityScorer.
+    /// * `ncm` - An object implementing NonconformityScorer.
     /// * `epsilon` - Either Some() significance level in [0,1] or None.
     /// * `seed` - Optionally, a slice of 2 elements is provided as seed
     ///            to the random number generator.
