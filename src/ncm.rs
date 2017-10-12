@@ -13,25 +13,79 @@ fn euclidean_distance(v1: &ArrayView1<f64>, v2: &ArrayView1<f64>) -> f64 {
       .sqrt()
 }
 
-/// T: type of a feature object
+/// A NonconformityScorer can be used to associate a
+/// nonconformity score to a new example.
+///
+/// This trait is parametrized over `T`, the element type.
 pub trait NonconformityScorer<T: Sync> {
-    /// Compute a k-NN nonconformity score on the i-th input
-    /// of inputs given all the rest of inputs.
+    /// Scores the `i`-th input vector given the remaining
+    /// `0, 1, ..., i-1, i+1, ..., n`.
+    ///
+    /// # Arguments
+    ///
+    /// `i` - Input to score.
+    /// `inputs` - View on matrix `ArrayView2<2>` containing all examples.
     fn score(&self, i: usize, &ArrayView2<T>) -> f64;
 }
 
+/// A k-NN nonconformity measure.
+///
+/// The score is defined for some distance metric and number of
+/// neighbors.
 pub struct KNN<T: Sync> {
     k: usize,
     distance: fn(&ArrayView1<T>, &ArrayView1<T>) -> f64,
 }
 
 impl KNN<f64> {
+    /// Constructs a k-NN nonconformity measure.
+    ///
+    /// # Arguments
+    ///
+    /// `k` - Number of nearest neighbors.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use random_world::ncm::*;
+    ///
+    /// let k = 2;
+    /// let ncm = KNN::new(k);
+    /// ```
     pub fn new(k: usize) -> KNN<f64> {
         KNN {k: k, distance: euclidean_distance}
     }
 }
 
 impl<T: Sync> NonconformityScorer<T> for KNN<T> {
+    /// Scores the `i`-th input vector given the remaining
+    /// ones with the k-NN nonconformity measure.
+    ///
+    /// # Arguments
+    ///
+    /// `i` - Input to score.
+    /// `inputs` - View on matrix `ArrayView2<2>` containing all examples.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// #[macro_use(array)]
+    /// extern crate ndarray;
+    /// extern crate random_world;
+    ///
+    /// # fn main() {
+    /// use random_world::ncm::*;
+    ///
+    /// let ncm = KNN::new(2);
+    ///
+    /// let train_inputs = array![[0., 0.],
+    ///                           [1., 0.],
+    ///                           [0., 1.],
+    ///                           [2., 2.]];
+    ///
+    /// assert!(ncm.score(0, &train_inputs.view()) == 2.);
+    /// # }
+    /// ```
     fn score(&self, i: usize, inputs: &ArrayView2<T>) -> f64 {
         let k = min(self.k, inputs.len()-1);
 
