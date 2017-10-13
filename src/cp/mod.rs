@@ -1,5 +1,9 @@
-use rusty_machine::learning::LearningResult;
+pub mod cp;
+
 use ndarray::prelude::*;
+use rusty_machine::learning::LearningResult;
+
+pub use self::cp::CP;
 
 
 /// A Confidence Predictor (either transductive or inductive)

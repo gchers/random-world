@@ -5,6 +5,7 @@ use rusty_machine::learning::LearningResult;
 use ndarray::prelude::*;
 use ndarray::{Axis};
 
+use cp::ConfidencePredictor;
 use ncm::NonconformityScorer;
 
 

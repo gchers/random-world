@@ -5,6 +5,10 @@ use std::collections::BinaryHeap;
 use std::iter::FromIterator;
 use ordered_float::OrderedFloat;
 
+use ncm::NonconformityScorer;
+
+
+/// Returns the Euclidean distance between two vectors of f64 values.
 fn euclidean_distance(v1: &ArrayView1<f64>, v2: &ArrayView1<f64>) -> f64 {
     v1.iter()
       .zip(v2.iter())

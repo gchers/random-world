@@ -1,4 +1,8 @@
+pub mod knn;
+
 use ndarray::prelude::*;
+
+pub use self::knn::*;
 
 /// A NonconformityScorer can be used to associate a
 /// nonconformity score to a new example.
