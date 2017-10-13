@@ -33,7 +33,7 @@ pub struct CP<T: Sync, N: NonconformityScorer<T>> {
     train_inputs: Option<Vec<Array2<T>>>,
 }
 
-impl<T: Sync, N: NonconformityScorer<T>> CP<T,N> {
+impl<T: Sync, N: NonconformityScorer<T>> CP<T, N> {
     /// Constructs a new deterministic Transductive Conformal Predictor
     /// `CP<T,N>` from a nonconformity score NonconformityScorer.
     ///
@@ -52,7 +52,7 @@ impl<T: Sync, N: NonconformityScorer<T>> CP<T,N> {
     /// let epsilon = 0.1;
     /// let mut cp = CP::new(ncm, Some(epsilon));
     /// ```
-    pub fn new(ncm: N, epsilon: Option<f64>) -> CP<T,N> {
+    pub fn new(ncm: N, epsilon: Option<f64>) -> CP<T, N> {
 
         if let Some(e) = epsilon {
             assert!(e >= 0. && e <= 1.);
@@ -89,7 +89,7 @@ impl<T: Sync, N: NonconformityScorer<T>> CP<T,N> {
     /// let mut cp = CP::new_smooth(ncm, Some(epsilon), Some(seed));
     /// ```
     pub fn new_smooth(ncm: N, epsilon: Option<f64>,
-                      seed: Option<[u64; 2]>) -> CP<T,N> {
+                      seed: Option<[u64; 2]>) -> CP<T, N> {
 
         if let Some(e) = epsilon {
             assert!(e >= 0. && e <= 1.);
@@ -100,15 +100,15 @@ impl<T: Sync, N: NonconformityScorer<T>> CP<T,N> {
             epsilon: epsilon,
             train_inputs: None,
             smooth: true,
-            rng: match seed{
-                    Some(seed) => Some(Pcg32::from_seed(seed)),
-                    None => Some(Pcg32::new_unseeded())
-                 },
+            rng: match seed {
+                Some(seed) => Some(Pcg32::from_seed(seed)),
+                None => Some(Pcg32::new_unseeded())
+            },
         }
     }
 }
 
-impl<T, N> ConfidencePredictor<T> for CP<T,N>
+impl<T, N> ConfidencePredictor<T> for CP<T, N>
         where T: Clone + Sync + Copy, N: NonconformityScorer<T> + Sync {
 
     /// Sets the significance level.
@@ -168,7 +168,7 @@ impl<T, N> ConfidencePredictor<T> for CP<T,N>
     /// Panics if the number of training examples is not consistent
     /// with the number of respective labels.
     fn train(&mut self, inputs: &Array2<T>, targets: &Array1<usize>)
-            -> LearningResult<()> {
+             -> LearningResult<()> {
 
         assert!(inputs.rows() == targets.len());
 
