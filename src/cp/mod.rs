@@ -1,3 +1,9 @@
+//! Module defining Conformal Predictors.
+//!
+//! A `ConfidencePredictor<T>` implements all methods to provide a confidence
+//! prediction for new input vectors.
+//! Examples of confidence predictors are inductive and transductive
+//! Conformal Predictors.
 pub mod cp;
 
 use ndarray::prelude::*;

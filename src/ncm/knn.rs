@@ -1,3 +1,4 @@
+//! k-NN nonconformity measure.
 use std::f64;
 use std::cmp::min;
 use ndarray::prelude::*;

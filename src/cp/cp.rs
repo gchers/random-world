@@ -1,3 +1,4 @@
+//! Transductive deterministic or smooth Conformal Predictors.
 use pcg_rand::Pcg32;
 use rand::{Rng, SeedableRng};
 use itertools::Itertools;

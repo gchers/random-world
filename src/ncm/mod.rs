@@ -1,3 +1,8 @@
+//! Module defining nonconformity measures.
+//!
+//! A `NonconformityScorer<T>` implements a nonconformity measure `score()`,
+//! which determines how "strange" a new input vector looks like with
+//! respect to previously observed ones.
 pub mod knn;
 
 use ndarray::prelude::*;
