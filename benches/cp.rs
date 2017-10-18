@@ -39,7 +39,7 @@ fn bench_cp_train(b: &mut Bencher) {
     let (inputs, targets) = generate_data(n, d, n_labels, seed);
 
     b.iter(|| {
-        let _ = cp.train(&inputs, &targets);
+        let _ = black_box(cp.train(&inputs.view(), &targets.view()));
     });
 }
 
@@ -55,9 +55,9 @@ fn bench_cp_predict(b: &mut Bencher) {
 
     let (inputs, targets) = generate_data(n, d, n_labels, seed);
 
-    let _ = cp.train(&inputs, &targets);
+    let _ = cp.train(&inputs.view(), &targets.view());
 
     b.iter(|| {
-        let _ = black_box(cp.predict_confidence(&inputs).unwrap());
+        let _ = black_box(cp.predict_confidence(&inputs.view()).unwrap());
     });
 }

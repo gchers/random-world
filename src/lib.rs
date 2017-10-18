@@ -44,9 +44,9 @@
 //!                          [2., 2.]];
 //!
 //! // Train and predict
-//! cp.train(&train_inputs, &train_targets)
+//! cp.train(&train_inputs.view(), &train_targets.view())
 //!   .expect("Failed prediction");
-//! let preds = cp.predict(&test_inputs)
+//! let preds = cp.predict(&test_inputs.view())
 //!               .expect("Failed to predict");
 //! assert!(preds == array![[false, true],
 //!                         [false, true]]);
@@ -55,7 +55,7 @@
 //!
 //! More examples on deterministic/smooth Conformal Predictors at
 //! [CP](/cp/cp/struct.CP.html).
-#![warn(missing_docs)]
+//#![warn(missing_docs)]
 
 extern crate rand;
 extern crate rayon;

@@ -33,15 +33,15 @@ mod tests {
         let expected_preds_2 = array![[true, true],
                                       [true, true]];
 
-        cp.train(&train_inputs, &train_targets).unwrap();
-        let pvalues = cp.predict_confidence(&test_inputs).unwrap();
+        cp.train(&train_inputs.view(), &train_targets.view()).unwrap();
+        let pvalues = cp.predict_confidence(&test_inputs.view()).unwrap();
         println!("Expected p-values: {:?}. P-values: {:?}.", expected_pvalues,
                  pvalues);
         assert!(pvalues == expected_pvalues);
         cp.set_epsilon(epsilon_1);
-        assert!(cp.predict(&test_inputs).unwrap() == expected_preds_1);
+        assert!(cp.predict(&test_inputs.view()).unwrap() == expected_preds_1);
         cp.set_epsilon(epsilon_2);
-        assert!(cp.predict(&test_inputs).unwrap() == expected_preds_2);
+        assert!(cp.predict(&test_inputs.view()).unwrap() == expected_preds_2);
     }
 
     #[test]
@@ -63,9 +63,9 @@ mod tests {
         let expected_pvalues = array![[0., 0.6688798670240814],
                                       [0.019990972812210628, 0.7553161717563366]];
 
-        cp.train(&train_inputs, &train_targets).unwrap();
+        cp.train(&train_inputs.view(), &train_targets.view()).unwrap();
 
-        let pvalues = cp.predict_confidence(&test_inputs).unwrap();
+        let pvalues = cp.predict_confidence(&test_inputs.view()).unwrap();
         println!("Expected p-values: {:?}.", expected_pvalues);
         println!("Actual p-values: {:?}.", pvalues);
         assert!(pvalues == expected_pvalues);

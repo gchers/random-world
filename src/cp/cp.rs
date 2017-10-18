@@ -159,7 +159,7 @@ impl<T, N> ConfidencePredictor<T> for CP<T, N>
     ///                           [1., 2.]];
     /// let train_targets = array![0, 0, 1, 1, 2, 2];
     ///
-    /// cp.train(&train_inputs, &train_targets)
+    /// cp.train(&train_inputs.view(), &train_targets.view())
     ///   .expect("Failed to train model");
     /// # }
     /// ```
@@ -168,7 +168,7 @@ impl<T, N> ConfidencePredictor<T> for CP<T, N>
     ///
     /// Panics if the number of training examples is not consistent
     /// with the number of respective labels.
-    fn train(&mut self, inputs: &Array2<T>, targets: &Array1<usize>)
+    fn train(&mut self, inputs: &ArrayView2<T>, targets: &ArrayView1<usize>)
              -> LearningResult<()> {
 
         assert!(inputs.rows() == targets.len());
@@ -176,7 +176,7 @@ impl<T, N> ConfidencePredictor<T> for CP<T, N>
         // Split examples w.r.t. their labels. For each unique label y,
         // self.train_inputs[y] will contain a matrix with the inputs with
         // label y.
-        let mut train_inputs = vec![]; //Vec::with_capacity(n_labels);
+        let mut train_inputs = vec![];
 
         // TODO: keep track of label ordering, shrink_to_fit()
         // use .select()?
@@ -235,16 +235,16 @@ impl<T, N> ConfidencePredictor<T> for CP<T, N>
     ///                          [2., 2.]];
     ///
     /// // Train and predict
-    /// cp.train(&train_inputs, &train_targets)
+    /// cp.train(&train_inputs.view(), &train_targets.view())
     ///   .expect("Failed prediction");
-    /// let preds = cp.predict(&test_inputs)
+    /// let preds = cp.predict(&test_inputs.view())
     ///               .expect("Failed to predict");
     /// assert!(preds == array![[false, true],
     ///                         [false, true]]);
     /// # }
     /// ```
     /// */
-    fn predict(&mut self, inputs: &Array2<T>) -> LearningResult<Array2<bool>> {
+    fn predict(&mut self, inputs: &ArrayView2<T>) -> LearningResult<Array2<bool>> {
         let epsilon = self.epsilon.expect("Specify epsilon to perform a standard predict()");
 
         let pvalues = self.predict_confidence(inputs).expect("Failed to predict p-values");
@@ -292,14 +292,14 @@ impl<T, N> ConfidencePredictor<T> for CP<T, N>
     ///                          [2., 2.]];
     ///
     /// // Train and predict p-values
-    /// cp.train(&train_inputs, &train_targets).unwrap();
-    /// let pvalues = cp.predict_confidence(&test_inputs)
+    /// cp.train(&train_inputs.view(), &train_targets.view()).unwrap();
+    /// let pvalues = cp.predict_confidence(&test_inputs.view())
     ///                 .expect("Failed prediction");
     /// assert!(pvalues == array![[0.25, 1.],
     ///                           [0.25, 1.]]);
     /// }
     /// ```
-    fn predict_confidence(&mut self, inputs: &Array2<T>) -> LearningResult<Array2<f64>> {
+    fn predict_confidence(&mut self, inputs: &ArrayView2<T>) -> LearningResult<Array2<f64>> {
         let CP { smooth,
                  ref train_inputs,
                  ref ncm,
@@ -386,7 +386,7 @@ mod tests {
                                          array![[2., 2.],
                                                 [1., 2.]]];
 
-        cp.train(&train_inputs, &train_targets).unwrap();
+        cp.train(&train_inputs.view(), &train_targets.view()).unwrap();
 
         assert!(cp.train_inputs.unwrap() == expected_train_inputs);
     }
