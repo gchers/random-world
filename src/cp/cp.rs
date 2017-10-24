@@ -166,21 +166,29 @@ impl<T, N> ConfidencePredictor<T> for CP<T, N>
     ///
     /// # Panics
     ///
-    /// Panics if the number of training examples is not consistent
-    /// with the number of respective labels.
+    /// - If the number of training examples is not consistent
+    ///   with the number of respective labels.
+    /// - If labels are not numbers starting from 0 and containing all
+    ///   numbers up to n_labels-1.
     fn train(&mut self, inputs: &ArrayView2<T>, targets: &ArrayView1<usize>)
              -> LearningResult<()> {
 
         assert!(inputs.rows() == targets.len());
+
+        // Get unique targets, and assert they are: 0, 1, ..., n_labels-1.
+        let unique_targets = targets.into_iter()
+                                    .unique()
+                                    .sorted();
+        for (i, &y) in unique_targets.iter().enumerate() {
+            assert!(i == *y, "Labels should contain 0, 1, ...");
+        }
 
         // Split examples w.r.t. their labels. For each unique label y,
         // self.train_inputs[y] will contain a matrix with the inputs with
         // label y.
         let mut train_inputs = vec![];
 
-        // TODO: keep track of label ordering, shrink_to_fit()
-        // use .select()?
-        for y in targets.iter().unique() {
+        for y in unique_targets {
             let inputs_y = inputs.outer_iter()
                                  .zip(targets)
                                  .filter(|&(_, _y)| _y== y)
@@ -322,7 +330,7 @@ impl<T, N> ConfidencePredictor<T> for CP<T, N>
                 // append to the matrix rather than creating a new one.
                 let train_inputs_tmp = stack![Axis(0), *train_inputs_y,
                                               test_x.into_shape((1, inputs.cols()))
-                                                    .unwrap()];
+                                                    .expect("Unexpected error in reshaping")];
 
                 let x_score = ncm.score(n_tmp-1, &train_inputs_tmp.view());
 
@@ -371,13 +379,13 @@ mod tests {
         let ncm = KNN::new(2);
         let mut cp = CP::new(ncm, Some(0.1));
 
-        let train_inputs = array![[0., 0.],
+        let train_inputs = array![[2., 2.],
+                                  [1., 2.],
+                                  [0., 0.],
                                   [1., 0.],
                                   [0., 1.],
-                                  [1., 1.],
-                                  [2., 2.],
-                                  [1., 2.]];
-        let train_targets = array![0, 0, 1, 1, 2, 2];
+                                  [1., 1.]];
+        let train_targets = array![2, 2, 0, 0, 1, 1];
 
         let expected_train_inputs = vec![array![[0., 0.],
                                                 [1., 0.]],
