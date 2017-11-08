@@ -55,7 +55,7 @@
 //!
 //! More examples on deterministic/smooth Conformal Predictors at
 //! [CP](/cp/cp/struct.CP.html).
-//#![warn(missing_docs)]
+#![warn(missing_docs)]
 
 extern crate rand;
 extern crate rayon;
