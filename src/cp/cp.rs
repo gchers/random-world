@@ -251,7 +251,6 @@ impl<T, N> ConfidencePredictor<T> for CP<T, N>
     ///                         [false, true]]);
     /// # }
     /// ```
-    /// */
     fn predict(&mut self, inputs: &ArrayView2<T>) -> LearningResult<Array2<bool>> {
         let epsilon = self.epsilon.expect("Specify epsilon to perform a standard predict()");
 
