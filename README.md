@@ -67,8 +67,8 @@ More examples on deterministic/smooth Conformal Predictors at
 
 Methods:
 - [x] Deterministic and smoothed Conformal Predictors (aka, transductive CP)
-- [ ] Deterministic and smoothed Inductive Conformal Predictors
-- [ ] Martingales
+- [ ] Deterministic and smoothed Inductive Conformal Predictors (ICP)
+- [ ] Plug-in martingales for exchangeability testing
 - [ ] Venn Predictors
 
 Nonconformity measures:
@@ -87,4 +87,7 @@ Binaries:
 
 * Giovanni Cherubin [giocher.com](https://giocher.com)
 
-## License
+## Similar Projects
+
+- [nonconformist](https://github.com/donlnz/nonconformist/) is a well
+  maintained Python implementation of CP and ICP.
