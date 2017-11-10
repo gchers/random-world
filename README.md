@@ -43,8 +43,13 @@ extern crate random_world;
 use random_world::cp::*;
 use random_world::ncm::*;
 
+// Create a k-NN nonconformity measure (k=2)
 let ncm = KNN::new(2);
+// Create a Conformal Predictor with the chosen nonconformity
+// measure and significance level 0.3.
 let mut cp = CP::new(ncm, Some(0.3));
+
+// Create a dataset
 let train_inputs = array![[0., 0.],
                           [1., 0.],
                           [0., 1.],
