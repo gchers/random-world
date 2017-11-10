@@ -10,19 +10,23 @@ These are the main goals of this library.
 The fact that something appears here does not imply that it has already been
 fulfilled.
 
-* Fast implementation of methods described in ALRW book
-* Be well documented
-* CP method should be able to use scoring classifiers from existing
+- Fast implementation of methods described in ALRW book
+- Be well documented
+- CP method should be able to use scoring classifiers from existing
   ML libraries (e.g., [rusty-machine](https://athemathmo.github.io/rusty-machine/doc/rusty_machine/), [rustlearn](https://maciejkula.github.io/rustlearn/doc/rustlearn/))
-* Easily interface with other languages (e.g., Python)
+- Easily interface with other languages (e.g., Python)
 - Provide standalone programs for some functions (e.g., in the way
   libsvm does for SVM methods)
 
 
 ## Install
 
-Using cargo, as soon as this code is published as a crate on
-[crates.io](crates.io).
+Include the following in _Cargo.toml_:
+
+```
+[dependencies]
+random-world = "0.1.0"
+```
 
 ## Quick Intro
 
@@ -59,8 +63,9 @@ let preds = cp.predict(&test_inputs.view())
 assert!(preds == array![[false, true],
                         [false, true]]);
 ```
-More examples on deterministic/smooth Conformal Predictors at
-[CP](/cp/cp/struct.CP.html).
+
+Please, read the [docs](https://docs.rs/random-world/0.1.0/random_world/) for
+more examples.
 
 
 ## Features
@@ -85,7 +90,7 @@ Binaries:
 
 ## Authors
 
-* Giovanni Cherubin [giocher.com](https://giocher.com)
+* Giovanni Cherubin ([giocher.com](https://giocher.com))
 
 ## Similar Projects
 
