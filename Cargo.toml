@@ -8,8 +8,12 @@ authors = ["Giovanni Cherubin <g.chers@gmail.com>"]
 
 [dependencies]
 rand = "0.3"
+csv = "1.0.0-beta.5"
 pcg_rand = "0.7.0"
 itertools = "0.6.2"
 ordered-float = "0.5.0"
 rusty-machine = "0.5.4"
 ndarray = "0.10.0"
+docopt = "0.8"
+serde = "1.0"
+serde_derive = "1.0"
