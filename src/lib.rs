@@ -64,6 +64,8 @@ extern crate rusty_machine;
 extern crate ordered_float;
 #[macro_use]
 extern crate ndarray;
+extern crate csv;
 
 pub mod cp;
 pub mod ncm;
+pub mod utils;
