@@ -1,9 +1,7 @@
+//! Utility routines for loading and storing data into files.
 use ndarray::prelude::*;
-use std::io::prelude::*;
-//use std::fs::File;
 use std::fmt::Display;
 use std::error::Error;
-use std::process;
 use csv::{Reader, Writer};
 
 /// Loads a CSV data file.
@@ -49,6 +47,13 @@ pub fn load_data(fname: String) -> Result<(Array2<f64>, Array1<usize>), Box<Erro
     Ok((inputs_a, Array::from_vec(targets)))
 }
 
+/// Stores predictions into a CSV file.
+///
+/// It stores either predictions (bool values) or p-values (f64)
+/// into a CSV file. Each line contains the predictions/p-values
+/// for one test object:
+///     x1, x2, ...
+/// where each value corresponds to a label.
 pub fn store_predictions<T>(predictions: ArrayView2<T>, fname: String)
         -> Result<(), Box<Error>> where T: Display {
     let mut writer = Writer::from_path(fname)?;
@@ -58,6 +63,6 @@ pub fn store_predictions<T>(predictions: ArrayView2<T>, fname: String)
                              .map(|v| format!("{}", v)))?;
     }
 
-    writer.flush();
+    writer.flush()?;
     Ok(())
 }
