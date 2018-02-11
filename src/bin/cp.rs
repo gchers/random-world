@@ -1,15 +1,12 @@
-#[macro_use]
 extern crate ndarray;
 #[macro_use]
 extern crate serde_derive;
 extern crate docopt;
 extern crate random_world;
 
-use ndarray::prelude::*;
 use random_world::cp::*;
 use random_world::ncm::*;
 use random_world::utils::{load_data, store_predictions};
-use std::io::prelude::*;
 use docopt::Docopt;
 
 const USAGE: &'static str = "
@@ -47,8 +44,6 @@ struct Args {
 
 fn main() {
     // Parse args from command line
-    let argv = std::env::args();
-
     let args: Args = Docopt::new(USAGE)
                             .and_then(|d| d.deserialize())
                             .unwrap_or_else(|e| e.exit());
@@ -75,9 +70,9 @@ fn main() {
 
     // Load training and test data.
     let (train_inputs, train_targets) = load_data(args.arg_training_file)
-                                        .expect("Failed to load");
-    let (test_inputs, test_targets) = load_data(args.arg_testing_file)
-                                        .expect("Failed to load");
+                                        .expect("Failed to load data");
+    let (test_inputs, _) = load_data(args.arg_testing_file)
+                                        .expect("Failed to load data");
 
     // Train.
     cp.train(&train_inputs.view(), &train_targets.view())
@@ -88,10 +83,12 @@ fn main() {
     if let Some(_) = args.flag_epsilon {
         let preds = cp.predict(&test_inputs.view())
                       .expect("Failed to predict");
-        store_predictions(preds.view(), args.arg_output_file);
+        store_predictions(preds.view(), args.arg_output_file)
+            .expect("Failed to store the output");
     } else {
         let preds = cp.predict_confidence(&test_inputs.view())
                       .expect("Failed to predict");
-        store_predictions(preds.view(), args.arg_output_file);
+        store_predictions(preds.view(), args.arg_output_file)
+            .expect("Failed to store the output");
     };
 }
