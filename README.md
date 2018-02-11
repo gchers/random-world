@@ -73,6 +73,43 @@ assert!(preds == array![[false, true],
 Please, read the [docs](https://docs.rs/random-world/0.1.0/random_world/) for
 more examples.
 
+## Standalone Binaries
+
+*random-world* provides standalone binaries for the main functionalities.
+
+### cp
+
+`bin/cp` runs CP on a training set, uses it to predict a test set;
+each dataset should be contained in a CSV file with rows:
+
+    label, x1, x2, ...
+
+where `label` is a label id (whose count needs to start from 0), and x1, x2, ...
+are the values forming a feature vector.
+
+Results are returned in a CSV file with rows:
+
+    p1, p2, ...
+
+where each value is either a prediction (true/false) or
+a p-value (float in [0,1]), depending on the chosen output;
+each row contains $L$ values, each one corresponding to
+one label.
+
+Example:
+```
+$ ./cp knn -k 1 train_data.csv test_data.csv predictions.csv
+```
+Runs CP with nonconformity measure k-NN (k=1) on `train_data.csv`,
+predicts `test_data.csv`, and stores the output into
+`predictions.csv`.
+The default output are p-values; to output actual predictions, specify
+a significance level with `--epsilon`.
+
+More options are documented in the help:
+```
+$ ./cp -h
+```
 
 ## Features
 
@@ -91,7 +128,7 @@ Bindings:
 - [ ] Python bindings
 
 Binaries:
-- [ ] CP
+- [x] CP
 - [ ] Martingales
 
 ## Authors
