@@ -220,7 +220,7 @@ fn kde(x: f64, x_previous: &[f64], bandwidth: Option<f64>) -> f64 {
     let h = match bandwidth {
         Some(h) => h,
         None => { // Silverman's rule of thumb.
-                  x_previous.std_dev()*(4./3./n).powf(1./5.)
+                  x_previous.std_dev()*(4.0/3.0/n).powf(0.2)
                 },
     };
     
@@ -229,6 +229,28 @@ fn kde(x: f64, x_previous: &[f64], bandwidth: Option<f64>) -> f64 {
 
     x_previous.iter()
               .map(|xi| (x - xi) / h)
-              .map(|u| (-0.5*u.powi(2).exp()))
+              .map(|u| ((-0.5*u.powi(2)).exp()))
               .sum::<f64>() / (n*h*q)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Verify KDE with rule of thumb for bandwidth.
+    #[test]
+    fn kde_silverman() {
+        let v = vec![0., 1., 2., 3., 4., 5., 6.];
+
+        assert!(kde(0., &v, None) == 0.08980564883842916);
+    }
+
+    /// Verify KDE with specified bandwidth.
+    #[test]
+    fn kde_bandwidth() {
+        let v = vec![0., 1., 2., 3., 4., 5., 6.];
+        let bandwidth = Some(0.1);
+
+        assert!(kde(0., &v, bandwidth) == 0.5699175434306182);
+    }
 }
