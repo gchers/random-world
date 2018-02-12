@@ -17,3 +17,5 @@
 //! }
 //! ```
 pub mod martingales;
+
+pub use self::martingales::Martingale;

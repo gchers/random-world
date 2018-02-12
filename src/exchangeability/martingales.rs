@@ -1,3 +1,4 @@
+//! Martingales for exchangeability testing.
 use std::f64;
 use statrs::statistics::Variance;
 /// Exchangeability Martingale.
@@ -23,6 +24,15 @@ pub struct Martingale {
 }
 
 impl Default for Martingale {
+    /// Default values for `Martingale`.
+    ///
+    /// NOTE: constructor methods (e.g., `new_power()`, `new_plugin()`)
+    /// should be preferred to using defaults; default for
+    /// `update_function`, for  example, is a meaningless placeholder
+    /// function.
+    /// If one wants to instantiate a `Martingale` with a custom
+    /// `update_function`, they are recommended to use the
+    /// `Martingale::from_function()` constructor.
     fn default() -> Martingale {
         Martingale {
             current: 1.0,
@@ -41,20 +51,30 @@ impl Martingale {
     /// # Arguments
     ///
     /// * `epsilon` - Parameter of the Power martingale.
-    fn new_power(epsilon: f64) -> Martingale {
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use random_world::exchangeability::*;
+    ///
+    /// let epsilon = 0.95;
+    /// let mut m = Martingale::new_power(epsilon);
+    /// ```
+    pub fn new_power(epsilon: f64) -> Martingale {
         assert!(epsilon >= 0.0 && epsilon <= 1.0);
 
         Martingale {
             update_function: Box::new(move |pvalue, _| {
                                         epsilon*pvalue.powf(epsilon-1.0)
                                     }),
-            pvalues: Some(vec![]),
             ..Default::default()
         }
     }
 
     /// Creates a new Simple Mixture martingale.
-    fn new_simple_mixture() -> Martingale {
+    ///
+    /// NOTE: this is currently not implemented.
+    pub fn new_simple_mixture() -> Martingale {
         unimplemented!();
     }
 
@@ -66,9 +86,19 @@ impl Martingale {
     ///
     /// # Arguments
     ///
-    /// * `bandwidth` - Bandwidth for the gaussian kernel in KDE.
-    fn new_plugin(bandwidth: Option<f64>) -> Martingale {
+    /// * `bandwidth` - Bandwidth for the gaussian kernel in KDE. Can be None.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use random_world::exchangeability::*;
+    ///
+    /// let bandwidth = 0.2;
+    /// let mut m = Martingale::new_plugin(Some(bandwidth));
+    /// ```
+    pub fn new_plugin(bandwidth: Option<f64>) -> Martingale {
         Martingale {
+            pvalues: Some(vec![]),
             update_function: Box::new(move |pvalue, pvalues| {
                                        kde(pvalue,
                                            &pvalues.as_ref()
@@ -89,7 +119,24 @@ impl Martingale {
     /// * `store_pvalues` - Whether `update_function` requires knowing
     ///     the previous p-values. If set to `false`, `self.pvalues`
     ///     is set to `None`.
-    fn from_function(update_function: Box<Fn(f64, &Option<Vec<f64>>) -> f64>,
+    ///
+    /// # Examples
+    ///
+    /// Create a Power martingale from a custom update function.
+    /// NOTE: to create a Power martingale, using `new_power()` is
+    /// to be preferred.
+    ///
+    /// ```
+    /// use random_world::exchangeability::*;
+    ///
+    /// let epsilon = 0.95;
+    /// let update_function = Box::new(move |pvalue: f64, _: &Option<Vec<f64>>| {
+    ///                                 epsilon*pvalue.powf(epsilon-1.0)
+    ///                                });
+    ///
+    /// let mut m = Martingale::from_function(update_function, false);
+    /// ```
+    pub fn from_function(update_function: Box<Fn(f64, &Option<Vec<f64>>) -> f64>,
             store_pvalues: bool) -> Martingale {
         let pvalues = match store_pvalues {
             true => Some(vec![]),
@@ -104,7 +151,18 @@ impl Martingale {
     }
 
     /// Returns the current value of the martingale.
-    fn current(&self) -> f64 {
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use random_world::exchangeability::*;
+    ///
+    /// let bandwidth = 0.2;
+    /// let mut m = Martingale::new_plugin(Some(bandwidth));
+    ///
+    /// println!("Current M: {}", m.current());
+    /// ```
+    pub fn current(&self) -> f64 {
         self.current
     }
 
@@ -113,7 +171,19 @@ impl Martingale {
     /// # Arguments
     ///
     /// * `pvalue` - The new observed p-value.
-    fn next(&mut self, pvalue: f64) -> f64 {
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use random_world::exchangeability::*;
+    ///
+    /// let bandwidth = 0.2;
+    /// let mut m = Martingale::new_plugin(Some(bandwidth));
+    /// let new_pvalue = 0.1;
+    ///
+    /// println!("Current M: {}", m.update(new_pvalue));
+    /// ```
+    pub fn update(&mut self, pvalue: f64) -> f64 {
         // Update.
         self.current = (self.update_function)(pvalue, &self.pvalues);
         // Store if required by the method.
@@ -126,7 +196,7 @@ impl Martingale {
 
     /// True if the current value of the martingale is larger
     /// than the selected threshold.
-    fn is_large(&self) -> bool {
+    pub fn is_large(&self) -> bool {
         self.current > self.threshold
     }
 }
@@ -143,7 +213,7 @@ impl Martingale {
 /// * `x` - New observation.
 /// * `x_previous` - Previous observations.
 /// * `bandwidth` - Bandwidth for the gaussian kernel in KDE.
-fn kde(x: f64, x_previous: &Vec<f64>, bandwidth: Option<f64>) -> f64 {
+fn kde(x: f64, x_previous: &[f64], bandwidth: Option<f64>) -> f64 {
 
     let n = x_previous.len() as f64;
 
