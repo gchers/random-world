@@ -65,7 +65,9 @@ extern crate ordered_float;
 #[macro_use]
 extern crate ndarray;
 extern crate csv;
+extern crate statrs;
 
 pub mod cp;
 pub mod ncm;
 pub mod utils;
+pub mod exchangeability;
