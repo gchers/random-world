@@ -32,6 +32,7 @@ pub struct CP<T: Sync, N: NonconformityScorer<T>> {
     // by a label y, where train_inputs[y] contains all training
     // inputs with label y.
     train_inputs: Option<Vec<Array2<T>>>,
+    n_labels: usize,
 }
 
 impl<T: Sync, N: NonconformityScorer<T>> CP<T, N> {
@@ -65,6 +66,7 @@ impl<T: Sync, N: NonconformityScorer<T>> CP<T, N> {
             smooth: false,
             train_inputs: None,
             rng: None,
+            n_labels: 0,
         }
     }
 
@@ -100,6 +102,7 @@ impl<T: Sync, N: NonconformityScorer<T>> CP<T, N> {
             ncm: ncm,
             epsilon: epsilon,
             train_inputs: None,
+            n_labels: 0,
             smooth: true,
             rng: match seed {
                 Some(seed) => Some(Pcg32::from_seed(seed)),
@@ -166,7 +169,7 @@ impl<T, N> ConfidencePredictor<T> for CP<T, N>
     ///
     /// # Panics
     ///
-    /// - If the number of training examples is not consistent
+    /// - if the number of training examples is not consistent
     ///   with the number of respective labels.
     /// - If labels are not numbers starting from 0 and containing all
     ///   numbers up to n_labels-1.
@@ -176,16 +179,19 @@ impl<T, N> ConfidencePredictor<T> for CP<T, N>
         assert!(inputs.rows() == targets.len());
 
         // Get unique targets, and assert they are: 0, 1, ..., n_labels-1.
+        // XXX: this will be removed once we use self.n_labels.
         let unique_targets = targets.into_iter()
                                     .unique()
                                     .sorted();
         for (i, &y) in unique_targets.iter().enumerate() {
             assert!(i == *y, "Labels should contain 0, 1, ...");
         }
+        self.n_labels = unique_targets.len();
 
         // Split examples w.r.t. their labels. For each unique label y,
         // self.train_inputs[y] will contain a matrix with the inputs with
         // label y.
+
         let mut train_inputs = vec![];
 
         for y in unique_targets {
@@ -201,10 +207,18 @@ impl<T, N> ConfidencePredictor<T> for CP<T, N>
             train_inputs.push(Array::from_shape_vec((n, d), inputs_y)
                                     .expect("Unexpected error in reshaping"))
         }
-
-        train_inputs.shrink_to_fit();
-
-        self.train_inputs = Some(train_inputs);
+        
+        // Convert to array and concatenate to previous training
+        // data if any.
+        if let Some(ref mut old_inputs) = self.train_inputs {
+            for y in 0..self.n_labels {
+                old_inputs[y] = stack![Axis(0), old_inputs[y].clone(),
+                                       train_inputs[y]];
+            }
+        }
+        else {
+            self.train_inputs = Some(train_inputs);
+        }
 
         Ok(())
     }
