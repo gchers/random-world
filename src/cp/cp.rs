@@ -180,24 +180,25 @@ impl<T, N> ConfidencePredictor<T> for CP<T, N>
 
         // Get unique targets, and assert they are: 0, 1, ..., n_labels-1.
         // XXX: this will be removed once we use self.n_labels.
-        let unique_targets = targets.into_iter()
-                                    .unique()
-                                    .sorted();
-        for (i, &y) in unique_targets.iter().enumerate() {
-            assert!(i == *y, "Labels should contain 0, 1, ...");
+        if self.train_inputs.is_none() {
+            let unique_targets = targets.into_iter()
+                                        .unique()
+                                        .sorted();
+            for (i, &y) in unique_targets.iter().enumerate() {
+                assert!(i == *y, "Labels should contain 0, 1, ...");
+            }
+            self.n_labels = unique_targets.len();
         }
-        self.n_labels = unique_targets.len();
 
         // Split examples w.r.t. their labels. For each unique label y,
         // self.train_inputs[y] will contain a matrix with the inputs with
         // label y.
-
         let mut train_inputs = vec![];
 
-        for y in unique_targets {
+        for y in 0..self.n_labels {
             let inputs_y = inputs.outer_iter()
                                  .zip(targets)
-                                 .filter(|&(_, _y)| _y== y)
+                                 .filter(|&(_, _y)| *_y == y)
                                  .flat_map(|(x, _)| x.to_vec())
                                  .collect::<Vec<_>>();
 
