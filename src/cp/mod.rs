@@ -35,6 +35,23 @@ pub trait ConfidencePredictor<T> {
     ///
     /// Please, see [CP](/cp/cp/struct.CP.html).
     fn train(&mut self, inputs: &ArrayView2<T>, targets: &ArrayView1<usize>) -> LearningResult<()>;
+    /// Updates a Conformal Predictor with more training data.
+    ///
+    /// After calling `train()` once, `update()` allows to add
+    /// inputs to the Conformal Predictor's training data,
+    /// which will be used for future predictions.
+    ///
+    /// # Arguments
+    ///
+    /// * `inputs` - Matrix (Array2<T>) with values of type T of training
+    ///              vectors.
+    /// * `targets` - Vector (Array1<T>) of labels corresponding to the
+    ///               training vectors.
+    ///
+    /// # Examples
+    ///
+    /// Please, see [CP](/cp/cp/struct.CP.html).
+    fn update(&mut self, inputs: &ArrayView2<T>, targets: &ArrayView1<usize>) -> LearningResult<()>;
     /// Returns candidate labels (region prediction) for test vectors.
     ///
     /// The return value is a matrix of `bool` (`Array2<bool>`) with shape

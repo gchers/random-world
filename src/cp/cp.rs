@@ -177,18 +177,19 @@ impl<T, N> ConfidencePredictor<T> for CP<T, N>
              -> LearningResult<()> {
 
         assert!(inputs.rows() == targets.len());
+        if self.train_inputs.is_some() {
+            panic!("Can only train() once. Use update() to update training data");
+        }
 
         // Get unique targets, and assert they are: 0, 1, ..., n_labels-1.
         // XXX: this will be removed once we use self.n_labels.
-        if self.train_inputs.is_none() {
-            let unique_targets = targets.into_iter()
-                                        .unique()
-                                        .sorted();
-            for (i, &y) in unique_targets.iter().enumerate() {
-                assert!(i == *y, "Labels should contain 0, 1, ...");
-            }
-            self.n_labels = unique_targets.len();
+        let unique_targets = targets.into_iter()
+                                    .unique()
+                                    .sorted();
+        for (i, &y) in unique_targets.iter().enumerate() {
+            assert!(i == *y, "Labels should contain 0, 1, ...");
         }
+        self.n_labels = unique_targets.len();
 
         // Split examples w.r.t. their labels. For each unique label y,
         // self.train_inputs[y] will contain a matrix with the inputs with
@@ -209,16 +210,124 @@ impl<T, N> ConfidencePredictor<T> for CP<T, N>
                                     .expect("Unexpected error in reshaping"))
         }
         
-        // Convert to array and concatenate to previous training
-        // data if any.
-        if let Some(ref mut old_inputs) = self.train_inputs {
-            for y in 0..self.n_labels {
-                old_inputs[y] = stack![Axis(0), old_inputs[y].clone(),
-                                       train_inputs[y]];
-            }
-        }
-        else {
-            self.train_inputs = Some(train_inputs);
+        self.train_inputs = Some(train_inputs);
+
+        Ok(())
+    }
+
+    /// Updates a Conformal Predictor with more training data.
+    ///
+    /// After calling `train()` once, `update()` allows to add
+    /// inputs to the Conformal Predictor's training data,
+    /// which will be used for future predictions.
+    ///
+    /// # Arguments
+    ///
+    /// * `inputs` - Matrix (Array2<T>) with values of type T of training
+    ///              vectors.
+    /// * `targets` - Vector (Array1<T>) of labels corresponding to the
+    ///               training vectors.
+    ///
+    /// # Examples
+    ///
+    /// The following examples creates two CPs, `cp` and `cp_alt`,
+    /// one `train()`-ed and `update()`d on partial data, the other
+    /// one `train()`-ed on full data;
+    /// these CPs are equivalent (i.e., their training data is identical).
+    ///
+    /// ```
+    /// #[macro_use(array)]
+    /// extern crate ndarray;
+    /// extern crate random_world;
+    ///
+    /// # fn main() {
+    /// use random_world::cp::*;
+    /// use random_world::ncm::*;
+    ///
+    /// // Train a CP
+    /// let ncm = KNN::new(2);
+    /// let mut cp = CP::new(ncm, Some(0.1));
+    /// let train_inputs_1 = array![[0., 0.],
+    ///                             [0., 1.],
+    ///                             [2., 2.]];
+    /// let train_targets_1 = array![0, 1, 2];
+    /// let train_inputs_2 = array![[1., 1.]];
+    /// let train_targets_2 = array![0];
+    /// let train_inputs_3 = array![[1., 2.],
+    ///                             [2., 1.]];
+    /// let train_targets_3 = array![1, 2];
+    ///
+    /// // First, train().
+    /// cp.train(&train_inputs_1.view(), &train_targets_1.view())
+    ///   .expect("Failed to train model");
+    /// // Update with new data.
+    /// cp.update(&train_inputs_2.view(), &train_targets_2.view())
+    ///   .expect("Failed to train model");
+    /// cp.update(&train_inputs_3.view(), &train_targets_3.view())
+    ///   .expect("Failed to train model");
+    ///
+    /// // All this is identical to training the
+    /// // CP on all data once.
+    /// let ncm_alt = KNN::new(2);
+    /// let mut cp_alt = CP::new(ncm_alt, Some(0.1));
+    ///
+    /// let train_inputs = array![[0., 0.],
+    ///                           [0., 1.],
+    ///                           [2., 2.],
+    ///                           [1., 1.],
+    ///                           [1., 2.],
+    ///                           [2., 1.]];
+    /// let train_targets = array![0, 1, 2, 0, 1, 2];
+    ///
+    /// cp_alt.train(&train_inputs.view(), &train_targets.view())
+    ///       .expect("Failed to train model");
+    ///
+    /// // The two CPs are equivalent.
+    /// let preds = cp.predict(&train_inputs.view())
+    ///               .expect("Failed to predict");
+    /// let preds_alt = cp_alt.predict(&train_inputs.view())
+    ///                       .expect("Failed to predict");
+    /// assert!(preds == preds_alt);
+    ///
+    /// # }
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// - if the number of training examples is not consistent
+    ///   with the number of respective labels.
+    /// - if labels are not numbers starting from 0 and containing all
+    ///   numbers up to n_labels-1.
+    /// - if `train()` hasn't been called once before (i.e., if
+    ///   `self.train_inputs` is `None`.
+    fn update(&mut self, inputs: &ArrayView2<T>, targets: &ArrayView1<usize>)
+             -> LearningResult<()> {
+
+        assert!(inputs.rows() == targets.len());
+
+        let mut train_inputs = match self.train_inputs {
+            Some(ref mut train_inputs) => train_inputs,
+            None => panic!("Call train() once before update()"),
+        };
+
+        // NOTE: when ndarray will have cheap concatenation, we
+        // should iterate once through (inputs, targets) and just
+        // append each (x, y) to the appropriate self.train_inputs[y].
+        // The current method is less efficient than that.
+        for y in 0..self.n_labels {
+            let inputs_y = inputs.outer_iter()
+                                 .zip(targets)
+                                 .filter(|&(_, _y)| *_y == y)
+                                 .flat_map(|(x, _)| x.to_vec())
+                                 .collect::<Vec<_>>();
+
+            let d = inputs.cols();
+            let n = inputs_y.len() / d;
+
+            let inputs_y_array = Array::from_shape_vec((n, d), inputs_y)
+                                       .expect("Unexpected error in reshaping");
+            train_inputs[y] = stack![Axis(0), train_inputs[y],
+                                     inputs_y_array];
         }
 
         Ok(())
@@ -411,6 +520,51 @@ mod tests {
         cp.train(&train_inputs.view(), &train_targets.view()).unwrap();
 
         assert!(cp.train_inputs.unwrap() == expected_train_inputs);
+    }
+
+    /// Verify that train() + update() on partial datasets is
+    /// equivalent to train()-ing on full dataset.
+    #[test]
+    fn update() {
+        // Train a CP
+        let ncm = KNN::new(2);
+        let mut cp = CP::new(ncm, Some(0.1));
+        let train_inputs_1 = array![[0., 0.],
+                                    [0., 1.],
+                                    [2., 2.]];
+        let train_targets_1 = array![0, 1, 2];
+        let train_inputs_2 = array![[1., 1.]];
+        let train_targets_2 = array![0];
+        let train_inputs_3 = array![[1., 2.],
+                                    [2., 1.]];
+        let train_targets_3 = array![1, 2];
+
+        // First, train().
+        cp.train(&train_inputs_1.view(), &train_targets_1.view())
+          .expect("Failed to train model");
+        // Update with new data.
+        cp.update(&train_inputs_2.view(), &train_targets_2.view())
+          .expect("Failed to train model");
+        cp.update(&train_inputs_3.view(), &train_targets_3.view())
+          .expect("Failed to train model");
+
+        // All this is identical to training the
+        // CP on all data once.
+        let ncm_alt = KNN::new(2);
+        let mut cp_alt = CP::new(ncm_alt, Some(0.1));
+
+        let train_inputs = array![[0., 0.],
+                                  [0., 1.],
+                                  [2., 2.],
+                                  [1., 1.],
+                                  [1., 2.],
+                                  [2., 1.]];
+        let train_targets = array![0, 1, 2, 0, 1, 2];
+
+        cp_alt.train(&train_inputs.view(), &train_targets.view())
+              .expect("Failed to train model");
+
+        assert!(cp.train_inputs == cp_alt.train_inputs);
     }
 
     /// Verify that the internal PRNG generates the same sequence
