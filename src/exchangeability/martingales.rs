@@ -185,11 +185,21 @@ impl Martingale {
     /// ```
     pub fn update(&mut self, pvalue: f64) -> f64 {
         // Update.
-        self.current = (self.update_function)(pvalue, &self.pvalues);
-        // Store if required by the method.
+        let mut update = (self.update_function)(pvalue, &self.pvalues);
+        // If the method requires storing previous p-values:
+        // - store the new p-value;
+        // - DO NOT update the martingale if this is the first
+        //   p-value we observe.
         if let Some(pvalues) = self.pvalues.as_mut() {
             pvalues.push(pvalue);
+            if pvalues.len() <= 2 {
+                eprintln!("Warning: the martingale won't be updated at this \
+                           step, as it requries seeing at least 2 pvalues");
+                update = 1.;
+            }
         }
+
+        self.current *= update;
 
         self.current
     }
