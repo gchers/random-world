@@ -66,6 +66,7 @@ extern crate ordered_float;
 extern crate ndarray;
 extern crate csv;
 extern crate statrs;
+extern crate quadrature;
 
 pub mod cp;
 pub mod ncm;
