@@ -1,5 +1,6 @@
 //! Martingales for exchangeability testing.
 use std::f64;
+use quadrature::integrate;
 use statrs::statistics::Variance;
 /// Exchangeability Martingale.
 ///
@@ -100,7 +101,7 @@ impl Martingale {
         Martingale {
             pvalues: Some(vec![]),
             update_function: Box::new(move |pvalue, pvalues| {
-                                       kde(pvalue,
+                                       plugin_update(pvalue,
                                            &pvalues.as_ref()
                                                    .expect("Plug-in martingale badly initialized"),
                                            bandwidth)
@@ -211,6 +212,36 @@ impl Martingale {
     }
 }
 
+/// Update function for Plug-in martingales.
+///
+/// As done in (Fedorova et al., 2012), the betting function is
+/// a KDE PDF estimate with gaussian kernel, computed on previous p-values.
+/// To get a better estimate, KDE is estimated on:
+///     ${p_i, -p_i, 2-p_i}$
+/// for each previous p-value $p_i$; then the estimate is normalized
+/// over [0,1] by dividing by the integral of the function in this interval.
+///
+/// # Arguments
+///
+/// `pvalue` - New p-value.
+/// `pvalues` - Previous recorded p-values.
+/// `bandwidth` - Bandiwdth for KDE with gaussian kernel. If `None`,
+///     Silverman's rule of thumb is used to determine it.
+fn plugin_update(pvalue: f64, pvalues: &[f64], bandwidth: Option<f64>) -> f64 {
+    // Augmented set of p-values.
+    let mut augmented_pvalues = Vec::with_capacity(3*pvalues.len());
+    for p in pvalues.into_iter() {
+        augmented_pvalues.push(*p);
+        augmented_pvalues.push(-p);
+        augmented_pvalues.push(2.-p);
+    }
+    // Compute integral of KDE function in [0,1].
+    let k = integrate(|x: f64| kde(x, &augmented_pvalues, bandwidth),
+                      0.0, 1.0, 1e-6).integral;
+    // Return normalized KDE prediction on x.
+    kde(pvalue, &augmented_pvalues, bandwidth) / k
+}
+
 /// Computes Kernel Density Estimate of a new observation given
 /// previous ones.
 ///
@@ -234,8 +265,7 @@ fn kde(x: f64, x_previous: &[f64], bandwidth: Option<f64>) -> f64 {
                 },
     };
     
-    // TODO: maybe hardcode value?
-    let q = (2.0*f64::consts::PI).sqrt();
+    let q = 2.5066282746310002;     // That's sqrt(2*pi)
 
     x_previous.iter()
               .map(|xi| (x - xi) / h)
@@ -262,5 +292,16 @@ mod tests {
         let bandwidth = Some(0.1);
 
         assert!(kde(0., &v, bandwidth) == 0.5699175434306182);
+    }
+
+    #[test]
+    fn plugin_martingale_update() {
+        let pvalues = [0.2, 0.6, 0.5, 0.8, 0.1];
+        let pvalue = 0.1;
+        let bandwidth = 0.1;
+
+        let update = plugin_update(pvalue, &pvalues, Some(bandwidth));
+
+        assert!(update == 1.398942285770281);
     }
 }
