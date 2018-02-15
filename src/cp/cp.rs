@@ -448,7 +448,7 @@ impl<T, N> ConfidencePredictor<T> for CP<T, N>
                 // If no training examples of label y, set the p-value to 1.
                 if train_inputs_y.rows() == 0 {
                     pvalues[[i,y]] = 1.;
-                    break;
+                    continue;
                 }
 
                 // Temporarily add test_x to training inputs with label y.
