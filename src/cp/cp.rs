@@ -28,11 +28,11 @@ pub struct CP<T: Sync, N: NonconformityScorer<T>> {
     epsilon: Option<f64>,
     smooth: bool,
     rng: Option<Pcg32>,
+    n_labels: usize,
     // Training inputs are stored in a train_inputs, indexed
     // by a label y, where train_inputs[y] contains all training
     // inputs with label y.
     train_inputs: Option<Vec<Array2<T>>>,
-    n_labels: usize,
 }
 
 impl<T: Sync, N: NonconformityScorer<T>> CP<T, N> {
@@ -42,6 +42,7 @@ impl<T: Sync, N: NonconformityScorer<T>> CP<T, N> {
     /// # Arguments
     ///
     /// * `ncm` - An object implementing NonconformityScorer.
+    /// * `n_labels` - The number of labels.
     /// * `epsilon` - Either Some() significance level in [0,1] or None.
     ///
     /// # Examples
@@ -51,10 +52,12 @@ impl<T: Sync, N: NonconformityScorer<T>> CP<T, N> {
     /// use random_world::ncm::*;
     ///
     /// let ncm = KNN::new(2);
+    /// let n_labels = 2;
     /// let epsilon = 0.1;
-    /// let mut cp = CP::new(ncm, Some(epsilon));
+    /// let mut cp = CP::new(ncm, n_labels, Some(epsilon));
     /// ```
-    pub fn new(ncm: N, epsilon: Option<f64>) -> CP<T, N> {
+    pub fn new(ncm: N, n_labels: usize, epsilon: Option<f64>) -> CP<T, N> {
+        assert!(n_labels > 0);
 
         if let Some(e) = epsilon {
             assert!(e >= 0. && e <= 1.);
@@ -64,9 +67,9 @@ impl<T: Sync, N: NonconformityScorer<T>> CP<T, N> {
             ncm: ncm,
             epsilon: epsilon,
             smooth: false,
+            n_labels: n_labels,
             train_inputs: None,
             rng: None,
-            n_labels: 0,
         }
     }
 
@@ -76,6 +79,7 @@ impl<T: Sync, N: NonconformityScorer<T>> CP<T, N> {
     /// # Arguments
     ///
     /// * `ncm` - An object implementing NonconformityScorer.
+    /// * `n_labels` - The number of labels.
     /// * `epsilon` - Either Some() significance level in [0,1] or None.
     /// * `seed` - Optionally, a slice of 2 elements is provided as seed
     ///            to the random number generator.
@@ -87,11 +91,12 @@ impl<T: Sync, N: NonconformityScorer<T>> CP<T, N> {
     /// use random_world::ncm::*;
     ///
     /// let ncm = KNN::new(2);
+    /// let n_labels = 2;
     /// let epsilon = 0.1;
     /// let seed = [0, 0];
-    /// let mut cp = CP::new_smooth(ncm, Some(epsilon), Some(seed));
+    /// let mut cp = CP::new_smooth(ncm, n_labels, Some(epsilon), Some(seed));
     /// ```
-    pub fn new_smooth(ncm: N, epsilon: Option<f64>,
+    pub fn new_smooth(ncm: N, n_labels: usize, epsilon: Option<f64>,
                       seed: Option<[u64; 2]>) -> CP<T, N> {
 
         if let Some(e) = epsilon {
@@ -101,9 +106,9 @@ impl<T: Sync, N: NonconformityScorer<T>> CP<T, N> {
         CP {
             ncm: ncm,
             epsilon: epsilon,
-            train_inputs: None,
-            n_labels: 0,
             smooth: true,
+            n_labels: n_labels,
+            train_inputs: None,
             rng: match seed {
                 Some(seed) => Some(Pcg32::from_seed(seed)),
                 None => Some(Pcg32::new_unseeded())
@@ -153,7 +158,9 @@ impl<T, N> ConfidencePredictor<T> for CP<T, N>
     ///
     /// // Train a CP
     /// let ncm = KNN::new(2);
-    /// let mut cp = CP::new(ncm, Some(0.1));
+    /// let n_labels = 3;
+    /// let epsilon = 0.1;
+    /// let mut cp = CP::new(ncm, n_labels, Some(epsilon));
     /// let train_inputs = array![[0., 0.],
     ///                           [1., 0.],
     ///                           [0., 1.],
@@ -181,33 +188,27 @@ impl<T, N> ConfidencePredictor<T> for CP<T, N>
             panic!("Can only train() once. Use update() to update training data");
         }
 
-        // Get unique targets, and assert they are: 0, 1, ..., n_labels-1.
-        // XXX: this will be removed once we use self.n_labels.
-        let unique_targets = targets.into_iter()
-                                    .unique()
-                                    .sorted();
-        for (i, &y) in unique_targets.iter().enumerate() {
-            assert!(i == *y, "Labels should contain 0, 1, ...");
-        }
-        self.n_labels = unique_targets.len();
-
         // Split examples w.r.t. their labels. For each unique label y,
         // self.train_inputs[y] will contain a matrix with the inputs with
         // label y.
+        // We first put them into a vector, and then will convert
+        // into array. This should guarantee memory contiguity.
+        // XXX: there may exist a better (faster) way.
+        let mut train_inputs_vec = vec![vec![]; self.n_labels];
+
+        for (x, y) in inputs.outer_iter().zip(targets) {
+            // Implicitly asserts that 0 <= y < self.n_labels.
+            train_inputs_vec[*y].extend(x.iter());
+        }
+
+        let d = inputs.cols();
+
+        // Convert into arrays.
         let mut train_inputs = vec![];
-
-        for y in 0..self.n_labels {
-            let inputs_y = inputs.outer_iter()
-                                 .zip(targets)
-                                 .filter(|&(_, _y)| *_y == y)
-                                 .flat_map(|(x, _)| x.to_vec())
-                                 .collect::<Vec<_>>();
-
-            let d = inputs.cols();
+        for inputs_y in train_inputs_vec {
             let n = inputs_y.len() / d;
-
             train_inputs.push(Array::from_shape_vec((n, d), inputs_y)
-                                    .expect("Unexpected error in reshaping"))
+                                    .expect("Unexpected error in reshaping"));
         }
         
         self.train_inputs = Some(train_inputs);
@@ -246,7 +247,9 @@ impl<T, N> ConfidencePredictor<T> for CP<T, N>
     ///
     /// // Train a CP
     /// let ncm = KNN::new(2);
-    /// let mut cp = CP::new(ncm, Some(0.1));
+    /// let n_labels = 3;
+    /// let epsilon = 0.1;
+    /// let mut cp = CP::new(ncm, n_labels, Some(epsilon));
     /// let train_inputs_1 = array![[0., 0.],
     ///                             [0., 1.],
     ///                             [2., 2.]];
@@ -269,7 +272,7 @@ impl<T, N> ConfidencePredictor<T> for CP<T, N>
     /// // All this is identical to training the
     /// // CP on all data once.
     /// let ncm_alt = KNN::new(2);
-    /// let mut cp_alt = CP::new(ncm_alt, Some(0.1));
+    /// let mut cp_alt = CP::new(ncm_alt, n_labels, Some(0.1));
     ///
     /// let train_inputs = array![[0., 0.],
     ///                           [0., 1.],
@@ -314,20 +317,10 @@ impl<T, N> ConfidencePredictor<T> for CP<T, N>
         // should iterate once through (inputs, targets) and just
         // append each (x, y) to the appropriate self.train_inputs[y].
         // The current method is less efficient than that.
-        for y in 0..self.n_labels {
-            let inputs_y = inputs.outer_iter()
-                                 .zip(targets)
-                                 .filter(|&(_, _y)| *_y == y)
-                                 .flat_map(|(x, _)| x.to_vec())
-                                 .collect::<Vec<_>>();
-
-            let d = inputs.cols();
-            let n = inputs_y.len() / d;
-
-            let inputs_y_array = Array::from_shape_vec((n, d), inputs_y)
-                                       .expect("Unexpected error in reshaping");
-            train_inputs[y] = stack![Axis(0), train_inputs[y],
-                                     inputs_y_array];
+        for (x, y) in inputs.outer_iter().zip(targets) {
+            train_inputs[*y] = stack![Axis(0), train_inputs[*y],
+                                      x.clone().into_shape((1, x.len()))
+                                               .expect("Unexpected reshaping error")];
         }
 
         Ok(())
@@ -355,7 +348,8 @@ impl<T, N> ConfidencePredictor<T> for CP<T, N>
     ///
     /// // Construct a deterministic CP with k-NN nonconformity measure (k=2).
     /// let ncm = KNN::new(2);
-    /// let mut cp = CP::new(ncm, Some(0.3));
+    /// let n_labels = 2;
+    /// let mut cp = CP::new(ncm, n_labels, Some(0.3));
     /// let train_inputs = array![[0., 0.],
     ///                           [1., 0.],
     ///                           [0., 1.],
@@ -411,7 +405,8 @@ impl<T, N> ConfidencePredictor<T> for CP<T, N>
     ///
     /// // Construct a deterministic CP with k-NN nonconformity measure (k=2).
     /// let ncm = KNN::new(2);
-    /// let mut cp = CP::new(ncm, Some(0.1));
+    /// let n_labels = 2;
+    /// let mut cp = CP::new(ncm, n_labels, Some(0.1));
     /// let train_inputs = array![[0., 0.],
     ///                           [1., 0.],
     ///                           [0., 1.],
@@ -500,7 +495,8 @@ mod tests {
     #[test]
     fn train() {
         let ncm = KNN::new(2);
-        let mut cp = CP::new(ncm, Some(0.1));
+        let n_labels = 3;
+        let mut cp = CP::new(ncm, n_labels, Some(0.1));
 
         let train_inputs = array![[2., 2.],
                                   [1., 2.],
@@ -528,7 +524,9 @@ mod tests {
     fn update() {
         // Train a CP
         let ncm = KNN::new(2);
-        let mut cp = CP::new(ncm, Some(0.1));
+        let n_labels = 3;
+        let epsilon = 0.1;
+        let mut cp = CP::new(ncm, n_labels, Some(epsilon));
         let train_inputs_1 = array![[0., 0.],
                                     [0., 1.],
                                     [2., 2.]];
@@ -551,7 +549,7 @@ mod tests {
         // All this is identical to training the
         // CP on all data once.
         let ncm_alt = KNN::new(2);
-        let mut cp_alt = CP::new(ncm_alt, Some(0.1));
+        let mut cp_alt = CP::new(ncm_alt, n_labels, Some(epsilon));
 
         let train_inputs = array![[0., 0.],
                                   [0., 1.],
@@ -574,8 +572,9 @@ mod tests {
     #[test]
     fn rnd_seeded() {
         let ncm = KNN::new(2);
+        let n_labels = 2;
         let seed = [0, 0];
-        let mut cp = CP::new_smooth(ncm, Some(0.1), Some(seed));
+        let mut cp = CP::new_smooth(ncm, n_labels, Some(0.1), Some(seed));
 
         let r  = cp.rng.as_mut()
                   .expect("Initialize smooth CP to use")
