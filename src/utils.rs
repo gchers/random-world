@@ -2,7 +2,7 @@
 use ndarray::prelude::*;
 use std::fmt::Display;
 use std::error::Error;
-use csv::{Reader, Writer};
+use csv::{ReaderBuilder, Writer};
 
 /// Loads a CSV data file.
 ///
@@ -10,7 +10,9 @@ use csv::{Reader, Writer};
 ///     label, x1, x2, ...
 /// where x1, x2, ... are features forming a feature vector.
 pub fn load_data(fname: String) -> Result<(Array2<f64>, Array1<usize>), Box<Error>> {
-    let mut reader = Reader::from_path(fname)?;
+    let mut reader = ReaderBuilder::new()
+                                   .has_headers(false)
+                                   .from_path(fname)?;
 
     let mut inputs: Vec<f64> = Vec::new();
     let mut targets: Vec<usize> = Vec::new();
@@ -75,7 +77,9 @@ pub fn store_predictions<T>(predictions: ArrayView2<T>, fname: String)
 ///     x1, x2, ...
 /// where each value corresponds to a label.
 pub fn load_pvalues(fname: String) -> Result<Array2<f64>, Box<Error>> {
-    let mut reader = Reader::from_path(fname)?;
+    let mut reader = ReaderBuilder::new()
+                                   .has_headers(false)
+                                   .from_path(fname)?;
 
     let mut pvalues = vec![];
     let mut d: Option<usize> = None;
