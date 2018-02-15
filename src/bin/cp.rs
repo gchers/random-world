@@ -4,11 +4,13 @@ extern crate ndarray;
 extern crate serde_derive;
 extern crate docopt;
 extern crate random_world;
+extern crate itertools;
 
 use ndarray::*;
 use random_world::cp::*;
 use random_world::ncm::*;
 use random_world::utils::{load_data, store_predictions};
+use itertools::Itertools;
 use docopt::Docopt;
 
 const USAGE: &'static str = "
@@ -26,6 +28,8 @@ Options:
     -s, --smooth                Smooth CP.
     --seed                      PRNG seed. Only used if --smooth set.
     -k, --knn=<kn>              Number of neighbors for k-NN [default: 5].
+    --n-labels=<n>              Number of labels. If specified in advance it
+                                slightly improves performances.
     -h, --help                  Show help.
     --version                   Show the version.
 ";
@@ -38,6 +42,7 @@ struct Args {
     flag_knn: usize,
     flag_kernel: Option<String>,
     flag_bandwidth: Option<f64>,
+    flag_n_labels: Option<usize>,
     arg_training_file: String,
     arg_testing_file: Option<String>,
     arg_output_file: String,
@@ -62,19 +67,27 @@ fn main() {
         panic!("This shouldn't happen");
     };
 
+    // Load training and test data.
+    let (train_inputs, train_targets) = load_data(args.arg_training_file)
+                                        .expect("Failed to load data");
+
+    // Number of labels.
+    let n_labels = match args.flag_n_labels {
+        Some(n_labels) => n_labels,
+        None => train_targets.into_iter()
+                             .unique()
+                             .count()
+    };
+
     let mut cp = if args.flag_smooth {
         let seed = match args.flag_seed {
             Some(s) => Some([0, s]),
             None => None,
         };
-        CP::new_smooth(ncm, args.flag_epsilon, seed)
+        CP::new_smooth(ncm, n_labels, args.flag_epsilon, seed)
     } else {
-        CP::new(ncm, args.flag_epsilon)
+        CP::new(ncm, n_labels, args.flag_epsilon)
     };
-
-    // Load training and test data.
-    let (train_inputs, train_targets) = load_data(args.arg_training_file)
-                                        .expect("Failed to load data");
 
     // If testing file is specified, predict test data.
     // Otherwise, use CP in on-line mode.
