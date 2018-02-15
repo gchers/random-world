@@ -282,8 +282,7 @@ mod tests {
     fn kde_silverman() {
         let v = vec![0., 1., 2., 3., 4., 5., 6.];
 
-        println!("{}", kde(0., &v, None));
-        assert_eq!(kde(0., &v, None), 0.08980564883842916);
+        assert_relative_eq!(kde(0., &v, None), 0.08980564883842916);
     }
 
     /// Verify KDE with specified bandwidth.
@@ -292,7 +291,7 @@ mod tests {
         let v = vec![0., 1., 2., 3., 4., 5., 6.];
         let bandwidth = Some(0.1);
 
-        assert!(kde(0., &v, bandwidth) == 0.5699175434306182);
+        assert_relative_eq!(kde(0., &v, bandwidth), 0.5699175434306182);
     }
 
     #[test]
@@ -303,6 +302,6 @@ mod tests {
 
         let update = plugin_update(pvalue, &pvalues, Some(bandwidth));
 
-        assert!(update == 1.398942285770281);
+        assert_relative_eq!(update, 1.398942285770281);
     }
 }
