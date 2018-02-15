@@ -44,7 +44,6 @@
 //! // Create a new Plug-in martingale with `bandwidth=None` (i.e.,
 //! // `bandwidth` will be automatically chosen using Silverman's method).
 //! let mut m = Martingale::new_plugin(Some(0.1));
-//! //let mut m = Martingale::new_power(0.95);
 //! 
 //! let y = array![0];          // Arbitrary label for data points.
 //!
