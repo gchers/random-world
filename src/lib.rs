@@ -32,7 +32,8 @@
 //! use random_world::ncm::*;
 //!
 //! let ncm = KNN::new(2);
-//! let mut cp = CP::new(ncm, Some(0.3));
+//! let n_labels = 2;
+//! let mut cp = CP::new(ncm, n_labels, Some(0.3));
 //! let train_inputs = array![[0., 0.],
 //!                           [1., 0.],
 //!                           [0., 1.],

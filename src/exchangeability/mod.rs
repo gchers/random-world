@@ -39,7 +39,8 @@
 //! // Note that the CP needs to be smoothed for the method to work.
 //! let seed = [1, 1];
 //! let ncm = KNN::new(1);
-//! let mut cp = CP::new_smooth(ncm, None, Some(seed));
+//! let n_labels = 1;
+//! let mut cp = CP::new_smooth(ncm, n_labels, None, Some(seed));
 //!
 //! // Create a new Plug-in martingale with `bandwidth=None` (i.e.,
 //! // `bandwidth` will be automatically chosen using Silverman's method).
