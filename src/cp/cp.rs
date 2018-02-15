@@ -437,10 +437,16 @@ impl<T, N> ConfidencePredictor<T> for CP<T, N>
 
         for (y, train_inputs_y) in train_inputs.into_iter().enumerate() {
 
-            // The number accounts of the object we will temporarily append.
+            // n_tmp accounts for the object we will temporarily append.
             let n_tmp = train_inputs_y.rows() + 1;
 
             for (i, test_x) in inputs.outer_iter().enumerate() {
+
+                // If no training examples of label y, set the p-value to 1.
+                if train_inputs_y.rows() == 0 {
+                    pvalues[[i,y]] = 1.;
+                    break;
+                }
 
                 // Temporarily add test_x to training inputs with label y.
                 // XXX: once ndarray supports appending a row, we should
