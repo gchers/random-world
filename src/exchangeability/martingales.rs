@@ -282,7 +282,8 @@ mod tests {
     fn kde_silverman() {
         let v = vec![0., 1., 2., 3., 4., 5., 6.];
 
-        assert!(kde(0., &v, None) == 0.08980564883842916);
+        println!("{}", kde(0., &v, None));
+        assert_eq!(kde(0., &v, None), 0.08980564883842916);
     }
 
     /// Verify KDE with specified bandwidth.
