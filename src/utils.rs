@@ -101,12 +101,13 @@ pub fn load_pvalues(fname: &String) -> Result<Array2<f64>, Box<Error>> {
                                        .parse::<f64>()
                                        .ok()
                                        .expect("Failed to parse")));
-        if let Some(x) = d {
-            if x != record.len() - 1 {
+        // Update length of a row.
+        if let Some(d) = d {
+            if d != record.len() {
                 panic!("File has wrong format");
-            } else {
-                d = Some(record.len() - 1);
             }
+        } else {
+            d = Some(record.len());
         }
     }
 
