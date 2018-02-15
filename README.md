@@ -98,13 +98,20 @@ one label.
 
 Example:
 ```
-$ ./cp knn -k 1 train_data.csv test_data.csv predictions.csv
+$ ./cp knn -k 1 predictions.csv train_data.csv test_data.csv
 ```
 Runs CP with nonconformity measure k-NN (k=1) on `train_data.csv`,
 predicts `test_data.csv`, and stores the output into
 `predictions.csv`.
 The default output are p-values; to output actual predictions, specify
 a significance level with `--epsilon`.
+
+To run CP in on-line mode on a dataset (i.e., predict one object
+per time and then append it to the training examples), only specify
+the training file:
+```
+$ ./cp knn -k 1 predictions.csv train_data.csv
+```
 
 More options are documented in the help:
 ```
@@ -128,7 +135,7 @@ Bindings:
 - [ ] Python bindings
 
 Binaries:
-- [x] CP
+- [x] CP (both batch prediction and on-line)
 - [ ] Martingales
 
 ## Authors
