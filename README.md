@@ -123,7 +123,7 @@ $ ./cp -h
 Methods:
 - [x] Deterministic and smoothed Conformal Predictors (aka, transductive CP)
 - [ ] Deterministic and smoothed Inductive Conformal Predictors (ICP)
-- [ ] Plug-in martingales for exchangeability testing
+- [x] Plug-in martingales for exchangeability testing
 - [ ] Venn Predictors
 
 Nonconformity measures:
@@ -136,7 +136,7 @@ Bindings:
 
 Binaries:
 - [x] CP (both batch prediction and on-line)
-- [ ] Martingales
+- [x] Martingales
 
 ## Authors
 
