@@ -68,6 +68,8 @@ extern crate ndarray;
 extern crate csv;
 extern crate statrs;
 extern crate quadrature;
+#[macro_use]
+extern crate approx;
 
 pub mod cp;
 pub mod ncm;

@@ -2,15 +2,18 @@
 use ndarray::prelude::*;
 use std::fmt::Display;
 use std::error::Error;
-use csv::{Reader, Writer};
+use std::fs::{File, OpenOptions};
+use csv::{ReaderBuilder, WriterBuilder};
 
 /// Loads a CSV data file.
 ///
 /// The file format should be, for each row:
 ///     label, x1, x2, ...
 /// where x1, x2, ... are features forming a feature vector.
-pub fn load_data(fname: String) -> Result<(Array2<f64>, Array1<usize>), Box<Error>> {
-    let mut reader = Reader::from_path(fname)?;
+pub fn load_data(fname: &String) -> Result<(Array2<f64>, Array1<usize>), Box<Error>> {
+    let mut reader = ReaderBuilder::new()
+                                   .has_headers(false)
+                                   .from_path(fname)?;
 
     let mut inputs: Vec<f64> = Vec::new();
     let mut targets: Vec<usize> = Vec::new();
@@ -54,9 +57,17 @@ pub fn load_data(fname: String) -> Result<(Array2<f64>, Array1<usize>), Box<Erro
 /// for one test object:
 ///     x1, x2, ...
 /// where each value corresponds to a label.
-pub fn store_predictions<T>(predictions: ArrayView2<T>, fname: String)
-        -> Result<(), Box<Error>> where T: Display {
-    let mut writer = Writer::from_path(fname)?;
+pub fn store_predictions<T>(predictions: ArrayView2<T>, fname: &String,
+        append: bool) -> Result<(), Box<Error>> where T: Display {
+    if !append {
+        // Empty the file.
+        let _ = File::create(fname)
+                     .expect("Failed to create file");
+    }
+    let mut writer = WriterBuilder::new().from_writer(OpenOptions::new()
+                                             .append(append)
+                                             .write(true)
+                                             .open(fname)?);
 
     for x in predictions.outer_iter() {
         writer.write_record(x.iter()
@@ -74,8 +85,10 @@ pub fn store_predictions<T>(predictions: ArrayView2<T>, fname: String)
 /// for one test object:
 ///     x1, x2, ...
 /// where each value corresponds to a label.
-pub fn load_pvalues(fname: String) -> Result<Array2<f64>, Box<Error>> {
-    let mut reader = Reader::from_path(fname)?;
+pub fn load_pvalues(fname: &String) -> Result<Array2<f64>, Box<Error>> {
+    let mut reader = ReaderBuilder::new()
+                                   .has_headers(false)
+                                   .from_path(fname)?;
 
     let mut pvalues = vec![];
     let mut d: Option<usize> = None;
