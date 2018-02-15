@@ -66,3 +66,44 @@ pub fn store_predictions<T>(predictions: ArrayView2<T>, fname: String)
     writer.flush()?;
     Ok(())
 }
+
+/// Loads predictions into a CSV file.
+///
+/// It stores either predictions (bool values) or p-values (f64)
+/// into a CSV file. Each line contains the predictions/p-values
+/// for one test object:
+///     x1, x2, ...
+/// where each value corresponds to a label.
+pub fn load_pvalues(fname: String) -> Result<Array2<f64>, Box<Error>> {
+    let mut reader = Reader::from_path(fname)?;
+
+    let mut pvalues = vec![];
+    let mut d: Option<usize> = None;
+
+    for result in reader.records() {
+        let record = result?;
+
+        pvalues.extend(record.iter()
+                             .map(|x| x.trim()
+                                       .parse::<f64>()
+                                       .ok()
+                                       .expect("Failed to parse")));
+        if let Some(x) = d {
+            if x != record.len() - 1 {
+                panic!("File has wrong format");
+            } else {
+                d = Some(record.len() - 1);
+            }
+        }
+    }
+
+    let pvalues_a = if let Some(d) = d {
+        let n = pvalues.len() / d;
+        Array::from_vec(pvalues)
+              .into_shape((n, d))?
+    } else {
+        panic!("File has wrong format");
+    };
+
+    Ok(pvalues_a)
+}
