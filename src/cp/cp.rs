@@ -4,6 +4,7 @@ use rand::{Rng, SeedableRng};
 use rusty_machine::learning::LearningResult;
 use ndarray::prelude::*;
 use ndarray::{Axis};
+use std::f64::NAN;
 
 use cp::ConfidencePredictor;
 use ncm::NonconformityScorer;
@@ -433,7 +434,9 @@ impl<T, N> ConfidencePredictor<T> for CP<T, N>
         let train_inputs = train_inputs.as_ref()
                                        .expect("You should train the model first");
 
-        let mut pvalues = Array2::<f64>::zeros((inputs.rows(), train_inputs.len()));
+        // Init with NaN to ease future debugging.
+        let mut pvalues = Array2::<f64>::from_elem((inputs.rows(), train_inputs.len()),
+                                                   NAN);
 
         for (y, train_inputs_y) in train_inputs.into_iter().enumerate() {
 
