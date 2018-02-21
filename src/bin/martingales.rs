@@ -6,8 +6,6 @@ extern crate docopt;
 extern crate random_world;
 
 use ndarray::prelude::*;
-use random_world::cp::*;
-use random_world::ncm::*;
 use random_world::exchangeability::*;
 use random_world::utils::{load_pvalues, store_predictions};
 use docopt::Docopt;
