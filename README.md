@@ -26,7 +26,7 @@ Include the following in _Cargo.toml_:
 
 ```
 [dependencies]
-random-world = "0.1.0"
+random-world = "0.2.0"
 ```
 
 ## Quick Intro
