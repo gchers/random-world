@@ -83,9 +83,9 @@ To install them, run:
 cargo install random-world
 ```
 
-### cp
+### cp-predict
 
-`cp` runs CP on a training set, uses it to predict a test set;
+`cp-predict` runs CP on a training set, uses it to predict a test set;
 each dataset should be contained in a CSV file with rows:
 
     label, x1, x2, ...
@@ -105,7 +105,7 @@ one label.
 
 Example:
 ```
-$ cp knn -k 1 predictions.csv train_data.csv test_data.csv
+$ cp-predict knn -k 1 predictions.csv train_data.csv test_data.csv
 ```
 Runs CP with nonconformity measure k-NN (k=1) on `train_data.csv`,
 predicts `test_data.csv`, and stores the output into
@@ -117,12 +117,12 @@ To run CP in on-line mode on a dataset (i.e., predict one object
 per time and then append it to the training examples), only specify
 the training file:
 ```
-$ cp knn -k 1 predictions.csv train_data.csv
+$ cp-predict knn -k 1 predictions.csv train_data.csv
 ```
 
 More options are documented in the help:
 ```
-$ cp -h
+$ cp-predict -h
 ```
 
 ## Features
