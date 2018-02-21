@@ -77,14 +77,21 @@ more examples.
 
 *random-world* provides standalone binaries for the main functionalities.
 
+To install them, run:
+
+```
+cargo install random-world
+```
+
 ### cp
 
-`bin/cp` runs CP on a training set, uses it to predict a test set;
+`cp` runs CP on a training set, uses it to predict a test set;
 each dataset should be contained in a CSV file with rows:
 
     label, x1, x2, ...
 
-where `label` is a label id (whose count needs to start from 0), and x1, x2, ...
+where `label` is a label id (whose count needs to start from 0, without any
+missing values), and x1, x2, ...
 are the values forming a feature vector.
 
 Results are returned in a CSV file with rows:
@@ -98,7 +105,7 @@ one label.
 
 Example:
 ```
-$ ./cp knn -k 1 predictions.csv train_data.csv test_data.csv
+$ cp knn -k 1 predictions.csv train_data.csv test_data.csv
 ```
 Runs CP with nonconformity measure k-NN (k=1) on `train_data.csv`,
 predicts `test_data.csv`, and stores the output into
@@ -110,12 +117,12 @@ To run CP in on-line mode on a dataset (i.e., predict one object
 per time and then append it to the training examples), only specify
 the training file:
 ```
-$ ./cp knn -k 1 predictions.csv train_data.csv
+$ cp knn -k 1 predictions.csv train_data.csv
 ```
 
 More options are documented in the help:
 ```
-$ ./cp -h
+$ cp -h
 ```
 
 ## Features
@@ -123,13 +130,13 @@ $ ./cp -h
 Methods:
 - [x] Deterministic and smoothed Conformal Predictors (aka, transductive CP)
 - [ ] Deterministic and smoothed Inductive Conformal Predictors (ICP)
-- [x] Plug-in martingales for exchangeability testing
+- [x] Plug-in and Power martingales for exchangeability testing
 - [ ] Venn Predictors
 
 Nonconformity measures:
 - [x] k-NN
 - [ ] KDE
-- [ ] Generic wrapper around existing ML scorers (e.g., rusty-machine)
+- [ ] Generic wrapper around ML scorers from existing libraries (e.g., rusty-machine)
 
 Bindings:
 - [ ] Python bindings
