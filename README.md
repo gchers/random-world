@@ -1,6 +1,4 @@
-# random-world
-
-[![Build Status](https://travis-ci.org/gchers/random-world.svg?branch=master)](https://travis-ci.org/gchers/random-world) ![Version](https://img.shields.io/crates/v/random-world.svg)
+# random-world [![Build Status](https://travis-ci.org/gchers/random-world.svg?branch=master)](https://travis-ci.org/gchers/random-world) ![Version](https://img.shields.io/crates/v/random-world.svg)
 
 This is a `rust` implementation of Machine Learning (ML) methods for confident
 prediction (e.g., Conformal Predictors) and related ones introduced in the book
