@@ -6,6 +6,7 @@
 pub mod knn;
 
 use ndarray::prelude::*;
+use rusty_machine::learning::LearningResult;
 
 pub use self::knn::KNN;
 
@@ -14,12 +15,12 @@ pub use self::knn::KNN;
 ///
 /// This trait is parametrized over `T`, the element type.
 pub trait NonconformityScorer<T: Sync> {
-    /// Scores the `i`-th input vector given the remaining
-    /// `0, 1, ..., i-1, i+1, ..., n`.
-    ///
-    /// # Arguments
-    ///
-    /// `i` - Input to score.
-    /// `inputs` - View on matrix `ArrayView2<2>` containing all examples.
-    fn score(&self, i: usize, &ArrayView2<T>) -> f64;
+    /// TODO doc
+    fn train(&mut self, inputs: &ArrayView2<T>, targets: &ArrayView1<usize>,
+             n_labels: usize) -> LearningResult<()>;
+    /// TODO doc
+    fn update(&mut self, inputs: &ArrayView2<T>, targets: &ArrayView1<usize>) -> LearningResult<()>;
+    /// TODO doc
+    fn scores(&self, input: &ArrayView1<T>, targets: usize) -> Vec<f64>;
+    fn score_one(&self, i: usize, inputs: &ArrayView2<T>) -> f64;
 }
