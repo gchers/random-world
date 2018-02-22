@@ -60,7 +60,19 @@ impl KNN<f64> {
 
 impl<T: Sync> NonconformityScorer<T> for KNN<T>
         where T: Clone + Sync + Copy {
-    /// TODO doc
+    /// Trains a k-NN nonconformity scorer.
+    ///
+    /// Note: `train()` should be only called once. To update the training
+    /// data of the `NonconformityScorer` use `update()`.
+    ///
+    ///
+    /// # Arguments
+    ///
+    /// * `inputs` - Matrix (Array2<T>) with values of type T of training
+    ///              vectors.
+    /// * `targets` - Vector (Array1<T>) of labels corresponding to the
+    ///               training vectors.
+    /// * `n_labels` - Number of unique labels in the classification problem.
     fn train(&mut self, inputs: &ArrayView2<T>, targets: &ArrayView1<usize>,
              n_labels: usize) -> LearningResult<()> {
         self.n_labels = Some(n_labels);
@@ -91,7 +103,18 @@ impl<T: Sync> NonconformityScorer<T> for KNN<T>
 
         Ok(())
     }
-    /// TODO doc
+    /// Updates a k-NN nonconformity scorer with more training data.
+    ///
+    /// After calling `train()` once, `update()` allows to add
+    /// inputs to the scorer's training data, which will be used
+    /// for future predictions.
+    ///
+    /// # Arguments
+    ///
+    /// * `inputs` - Matrix (Array2<T>) with values of type T of training
+    ///              vectors.
+    /// * `targets` - Vector (Array1<T>) of labels corresponding to the
+    ///               training vectors.
     fn update(&mut self, inputs: &ArrayView2<T>, targets: &ArrayView1<usize>)
         -> LearningResult<()> {
 
@@ -112,10 +135,19 @@ impl<T: Sync> NonconformityScorer<T> for KNN<T>
 
         Ok(())
     }
-    /// TODO doc
-    /// Returns the nonconformity scores of examples (x, x_1, ..., x_n),
-    /// where (x_1, ..., x_n) are the training inputs and x is the new
-    /// input.
+    /// Computes the nonconformity scores of training inputs and of a new
+    /// test example.
+    ///
+    /// Specifically, nonconformity scores a_i, where (a_1, ..., a_{n-1})
+    /// are those corresponding to training examples, and a_n is the
+    /// nonconformity score of the new example (x, y), are returned in the
+    /// following order:
+    ///     (a_n, a_1, a_2, ..., a_{n-1}).
+    ///
+    /// # Arguments
+    ///
+    /// * `x` - Test object.
+    /// * `y` - (Candidate) label for the test object.
     fn scores(&self, x: &ArrayView1<T>, y: usize) -> Vec<f64> {
         let train_inputs = self.train_inputs.as_ref()
                                        .expect("You should train the model first");
@@ -128,8 +160,6 @@ impl<T: Sync> NonconformityScorer<T> for KNN<T>
                                                 .expect("Unexpected error in reshaping"),
                                       train_inputs_y.clone()];
 
-        //let k = min(self.k, train_inputs_tmp.len()-1);
-
         let mut scores = Vec::with_capacity(train_inputs_tmp.len());
 
         for i in 0..train_inputs_tmp.rows() {
@@ -138,7 +168,6 @@ impl<T: Sync> NonconformityScorer<T> for KNN<T>
 
         scores
     }
-
     /// Scores the `i`-th input vector given the remaining
     /// ones with the k-NN nonconformity measure.
     ///
@@ -238,7 +267,6 @@ mod tests {
         // Train a k-NN
         let mut ncm = KNN::new(2);
         let n_labels = 3;
-        let epsilon = 0.1;
         let train_inputs_1 = array![[0., 0.],
                                     [0., 1.],
                                     [2., 2.]];
@@ -292,7 +320,8 @@ mod tests {
         let test_target = 0;
         let n_labels = 1;
 
-        knn.train(&train_inputs.view(), &train_targets.view(), n_labels);
+        knn.train(&train_inputs.view(), &train_targets.view(), n_labels)
+           .expect("Failed to train k-NN ncm");
         let scores = knn.scores(&test_input.view(), test_target);
 
         assert!(scores == expected_scores);
