@@ -79,10 +79,7 @@ impl<T: Sync> NonconformityScorer<T> for KNN<T> {
     fn score(&self, i: usize, inputs: &ArrayView2<T>) -> f64 {
         let k = min(self.k, inputs.len()-1);
 
-        let ii = i as isize;
-        let input = inputs.slice(s![ii..ii+1, ..])
-                          .into_shape((inputs.cols()))
-                          .expect("Unexpected error in extracting row");
+        let input = inputs.row(i);
 
         let mut heap = BinaryHeap::from_iter(inputs.outer_iter()
                                                    .enumerate()
@@ -98,9 +95,11 @@ impl<T: Sync> NonconformityScorer<T> for KNN<T> {
         let mut sum = 0.;
 
         for _ in 0..k {
-            sum -= heap.pop()
-                       .expect("Unexpected error in finding k-smallest")
-                       .0;
+            if let Some(d) = heap.pop() {
+                sum -= d.into_inner();
+            } else {
+                break;
+            }
         }
 
         sum
