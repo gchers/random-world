@@ -76,7 +76,8 @@ more examples.
 
 *random-world* provides standalone binaries for the main functionalities.
 
-To install them, run:
+To install them, first install Rust's package manager
+[cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html), then run:
 
 ```
 cargo install random-world
@@ -89,9 +90,11 @@ each dataset should be contained in a CSV file with rows:
 
     label, x1, x2, ...
 
-where `label` is a label id (whose count needs to start from 0, without any
-missing values), and x1, x2, ...
+where `label` is a label id, and x1, x2, ...
 are the values forming a feature vector.
+It is important that label ids are `0, 1, ..., n_labels-1` (i.e., with no
+missing values); one can specify  `--n-labels` if not all labels
+are available in the initial training data (e.g., in on-line mode).
 
 Results are returned in a CSV file with rows:
 
