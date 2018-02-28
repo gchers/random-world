@@ -3,8 +3,8 @@ use pcg_rand::Pcg32;
 use rand::{Rng, SeedableRng};
 use rusty_machine::learning::LearningResult;
 use ndarray::prelude::*;
-use ndarray::{Axis};
 use std::f64::NAN;
+use std::marker::PhantomData;
 
 use cp::ConfidencePredictor;
 use ncm::NonconformityScorer;
@@ -29,10 +29,8 @@ pub struct CP<T: Sync, N: NonconformityScorer<T>> {
     smooth: bool,
     rng: Option<Pcg32>,
     n_labels: usize,
-    // Training inputs are stored in a train_inputs, indexed
-    // by a label y, where train_inputs[y] contains all training
-    // inputs with label y.
-    train_inputs: Option<Vec<Array2<T>>>,
+    // TODO: remove the following
+    marker: PhantomData<T>,
 }
 
 impl<T: Sync, N: NonconformityScorer<T>> CP<T, N> {
@@ -68,8 +66,8 @@ impl<T: Sync, N: NonconformityScorer<T>> CP<T, N> {
             epsilon: epsilon,
             smooth: false,
             n_labels: n_labels,
-            train_inputs: None,
             rng: None,
+            marker: PhantomData,
         }
     }
 
@@ -108,11 +106,11 @@ impl<T: Sync, N: NonconformityScorer<T>> CP<T, N> {
             epsilon: epsilon,
             smooth: true,
             n_labels: n_labels,
-            train_inputs: None,
             rng: match seed {
                 Some(seed) => Some(Pcg32::from_seed(seed)),
                 None => Some(Pcg32::new_unseeded())
             },
+            marker: PhantomData,
         }
     }
 }
@@ -184,36 +182,11 @@ impl<T, N> ConfidencePredictor<T> for CP<T, N>
              -> LearningResult<()> {
 
         assert!(inputs.rows() == targets.len());
-        if self.train_inputs.is_some() {
-            panic!("Can only train() once. Use update() to update training data");
-        }
+        //if self.train_inputs.is_some() {
+        //    panic!("Can only train() once. Use update() to update training data");
+        //}
 
-        // Split examples w.r.t. their labels. For each unique label y,
-        // self.train_inputs[y] will contain a matrix with the inputs with
-        // label y.
-        // We first put them into a vector, and then will convert
-        // into array. This should guarantee memory contiguity.
-        // XXX: there may exist a better (faster) way.
-        let mut train_inputs_vec = vec![vec![]; self.n_labels];
-
-        for (x, y) in inputs.outer_iter().zip(targets) {
-            // Implicitly asserts that 0 <= y < self.n_labels.
-            train_inputs_vec[*y].extend(x.iter());
-        }
-
-        let d = inputs.cols();
-
-        // Convert into arrays.
-        let mut train_inputs = vec![];
-        for inputs_y in train_inputs_vec {
-            let n = inputs_y.len() / d;
-            train_inputs.push(Array::from_shape_vec((n, d), inputs_y)
-                                    .expect("Unexpected error in reshaping"));
-        }
-        
-        self.train_inputs = Some(train_inputs);
-
-        Ok(())
+        self.ncm.train(inputs, targets, self.n_labels)
     }
 
     /// Updates a Conformal Predictor with more training data.
@@ -308,22 +281,7 @@ impl<T, N> ConfidencePredictor<T> for CP<T, N>
 
         assert!(inputs.rows() == targets.len());
 
-        let mut train_inputs = match self.train_inputs {
-            Some(ref mut train_inputs) => train_inputs,
-            None => panic!("Call train() once before update()"),
-        };
-
-        // NOTE: when ndarray will have cheap concatenation, we
-        // should iterate once through (inputs, targets) and just
-        // append each (x, y) to the appropriate self.train_inputs[y].
-        // The current method is less efficient than that.
-        for (x, y) in inputs.outer_iter().zip(targets) {
-            train_inputs[*y] = stack![Axis(0), train_inputs[*y],
-                                      x.clone().into_shape((1, x.len()))
-                                               .expect("Unexpected reshaping error")];
-        }
-
-        Ok(())
+        self.ncm.update(inputs, targets)
     }
 
     /// Returns candidate labels (region prediction) for test vectors.
@@ -426,63 +384,36 @@ impl<T, N> ConfidencePredictor<T> for CP<T, N>
     /// }
     /// ```
     fn predict_confidence(&mut self, inputs: &ArrayView2<T>) -> LearningResult<Array2<f64>> {
-        let CP { smooth,
-                 ref train_inputs,
-                 ref ncm,
-                 ref mut rng, .. } = *self;
+        // Init pvalues with NaN to ease future debugging.
+        let mut pvalues = Array2::<f64>::from_elem((inputs.rows(), self.n_labels), NAN);
 
-        let train_inputs = train_inputs.as_ref()
-                                       .expect("You should train the model first");
-
-        // Init with NaN to ease future debugging.
-        let mut pvalues = Array2::<f64>::from_elem((inputs.rows(), train_inputs.len()),
-                                                   NAN);
-
-        for (y, train_inputs_y) in train_inputs.into_iter().enumerate() {
-
-            // n_tmp accounts for the object we will temporarily append.
-            let n_tmp = train_inputs_y.rows() + 1;
-
-            for (i, test_x) in inputs.outer_iter().enumerate() {
-
-                // If no training examples of label y, set the p-value to 1.
-                if train_inputs_y.rows() == 0 {
-                    pvalues[[i,y]] = 1.;
-                    continue;
-                }
-
-                // Temporarily add test_x to training inputs with label y.
-                // XXX: once ndarray supports appending a row, we should
-                // append to the matrix rather than creating a new one.
-                let train_inputs_tmp = stack![Axis(0), *train_inputs_y,
-                                              test_x.into_shape((1, inputs.cols()))
-                                                    .expect("Unexpected error in reshaping")];
-
-                let x_score = ncm.score(n_tmp-1, &train_inputs_tmp.view());
+        // Compute a p-value for each test input and for each candidate label.
+        for (i, x) in inputs.outer_iter().enumerate() {
+            for y in 0..self.n_labels {
+                let scores = self.ncm.scores(&x, y);
+                let x_score = scores[0];
 
                 let mut gt = 0.;
                 let mut eq = 1.;
 
-                for j in 0..n_tmp-1 {
-                    // Compute nonconformity scores.
-                    let score = ncm.score(j, &train_inputs_tmp.view());
-
+                let n = scores.len();
+                for score in scores.into_iter().skip(1) {
                     // Keep track of greater than and equal.
                     match () {
                         _ if score > x_score => gt += 1.,
                         _ if score == x_score => eq += 1.,
                         _ => {},
                     }
-                };
+                }
 
                 // Compute p-value.
-                let pvalue = if smooth {
-                    let tau = rng.as_mut()
-                                 .expect("Initialize as smooth CP to use")
-                                 .gen::<f64>();
-                    (gt + eq*tau) / (n_tmp as f64)
+                let pvalue = if self.smooth {
+                    let tau = self.rng.as_mut()
+                                      .expect("Initialize as smooth CP to use")
+                                      .gen::<f64>();
+                    (gt + eq*tau) / (n as f64)
                 } else {
-                    (gt + eq) / (n_tmp as f64)
+                    (gt + eq) / (n as f64)
                 };
 
                 pvalues[[i,y]] = pvalue;
@@ -496,83 +427,8 @@ impl<T, N> ConfidencePredictor<T> for CP<T, N>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ncm::KNN;
+    use ncm::*;
     
-    /// Verify that training CP succeeds properly (i.e., it
-    /// correctly splits training inputs per label).
-    #[test]
-    fn train() {
-        let ncm = KNN::new(2);
-        let n_labels = 3;
-        let mut cp = CP::new(ncm, n_labels, Some(0.1));
-
-        let train_inputs = array![[2., 2.],
-                                  [1., 2.],
-                                  [0., 0.],
-                                  [1., 0.],
-                                  [0., 1.],
-                                  [1., 1.]];
-        let train_targets = array![2, 2, 0, 0, 1, 1];
-
-        let expected_train_inputs = vec![array![[0., 0.],
-                                                [1., 0.]],
-                                         array![[0., 1.],
-                                                [1., 1.]],
-                                         array![[2., 2.],
-                                                [1., 2.]]];
-
-        cp.train(&train_inputs.view(), &train_targets.view()).unwrap();
-
-        assert!(cp.train_inputs.unwrap() == expected_train_inputs);
-    }
-
-    /// Verify that train() + update() on partial datasets is
-    /// equivalent to train()-ing on full dataset.
-    #[test]
-    fn update() {
-        // Train a CP
-        let ncm = KNN::new(2);
-        let n_labels = 3;
-        let epsilon = 0.1;
-        let mut cp = CP::new(ncm, n_labels, Some(epsilon));
-        let train_inputs_1 = array![[0., 0.],
-                                    [0., 1.],
-                                    [2., 2.]];
-        let train_targets_1 = array![0, 1, 2];
-        let train_inputs_2 = array![[1., 1.]];
-        let train_targets_2 = array![0];
-        let train_inputs_3 = array![[1., 2.],
-                                    [2., 1.]];
-        let train_targets_3 = array![1, 2];
-
-        // First, train().
-        cp.train(&train_inputs_1.view(), &train_targets_1.view())
-          .expect("Failed to train model");
-        // Update with new data.
-        cp.update(&train_inputs_2.view(), &train_targets_2.view())
-          .expect("Failed to train model");
-        cp.update(&train_inputs_3.view(), &train_targets_3.view())
-          .expect("Failed to train model");
-
-        // All this is identical to training the
-        // CP on all data once.
-        let ncm_alt = KNN::new(2);
-        let mut cp_alt = CP::new(ncm_alt, n_labels, Some(epsilon));
-
-        let train_inputs = array![[0., 0.],
-                                  [0., 1.],
-                                  [2., 2.],
-                                  [1., 1.],
-                                  [1., 2.],
-                                  [2., 1.]];
-        let train_targets = array![0, 1, 2, 0, 1, 2];
-
-        cp_alt.train(&train_inputs.view(), &train_targets.view())
-              .expect("Failed to train model");
-
-        assert!(cp.train_inputs == cp_alt.train_inputs);
-    }
-
     /// Verify that the internal PRNG generates the same sequence
     /// of numbers when seeded.
     /// NOTE: if we ever want to change the PRNG, the hardcoded

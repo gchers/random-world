@@ -62,8 +62,8 @@ mod tests {
         let train_targets = array![0, 0, 0, 1, 1, 1];
         let test_inputs = array![[2., 1.],
                                  [2., 2.]];
-        let expected_pvalues = array![[0., 0.6688798670240814],
-                                      [0.019990972812210628, 0.7553161717563366]];
+        let expected_pvalues = array![[0., 0.07996389124884251],
+                                      [0.16721996675602036, 0.7553161717563366]];
 
         cp.train(&train_inputs.view(), &train_targets.view()).unwrap();
 
