@@ -19,6 +19,39 @@ fn euclidean_distance(v1: &ArrayView1<f64>, v2: &ArrayView1<f64>) -> f64 {
       .sqrt()
 }
 
+/// Splits inputs according to their labels.
+///
+/// Returns as output a `train_inputs: Vec<Array2<T>>`, such that for each
+/// unique label `y`, `train_inputs[y]` contains a matrix with the inputs with
+/// label `y`.
+fn split_inputs<T>(inputs: &ArrayView2<T>, targets: &ArrayView1<usize>,
+         n_labels: usize) -> Vec<Array2<T>> where T: Clone + Sync + Copy {
+    // Split examples w.r.t. their labels. For each unique label y,
+    // train_inputs[y] will contain a matrix with the inputs with
+    // label y.
+    // We first put them into a vector, and then will convert them
+    // into array. This should guarantee memory contiguity.
+    // XXX: there may exist a better (faster) way.
+    let mut train_inputs_vec = vec![vec![]; n_labels];
+
+    for (x, y) in inputs.outer_iter().zip(targets) {
+        // Implicitly asserts that 0 <= y < self.n_labels.
+        train_inputs_vec[*y].extend(x.iter());
+    }
+
+    let d = inputs.cols();
+
+    // Convert into arrays.
+    let mut train_inputs = vec![];
+    for inputs_y in train_inputs_vec {
+        let n = inputs_y.len() / d;
+        train_inputs.push(Array::from_shape_vec((n, d), inputs_y)
+                                .expect("Unexpected error in reshaping"));
+    }
+
+    train_inputs
+}
+
 /// A k-NN nonconformity measure.
 ///
 /// The score is defined for some distance metric and number of
@@ -31,6 +64,10 @@ pub struct KNN<T: Sync> {
     // by a label y, where train_inputs[y] contains all training
     // inputs with label y.
     train_inputs: Option<Vec<Array2<T>>>,
+    // Calibration inputs are optional. If set, then the
+    // NCM is trained on train_inputs, and the scores are
+    // computed on calibration_inputs.
+    calibration_inputs: Option<Vec<Array2<T>>>,
 }
 
 impl KNN<f64> {
@@ -53,6 +90,7 @@ impl KNN<f64> {
             k: k,
             distance: euclidean_distance,
             train_inputs: None,
+            calibration_inputs: None,
             n_labels: None,
         }
     }
@@ -75,34 +113,31 @@ impl<T: Sync> NonconformityScorer<T> for KNN<T>
     /// * `n_labels` - Number of unique labels in the classification problem.
     fn train(&mut self, inputs: &ArrayView2<T>, targets: &ArrayView1<usize>,
              n_labels: usize) -> LearningResult<()> {
+        if self.train_inputs.is_some() {
+            //Fail
+        }
         self.n_labels = Some(n_labels);
-        // Split examples w.r.t. their labels. For each unique label y,
-        // self.train_inputs[y] will contain a matrix with the inputs with
-        // label y.
-        // We first put them into a vector, and then will convert them
-        // into array. This should guarantee memory contiguity.
-        // XXX: there may exist a better (faster) way.
-        let mut train_inputs_vec = vec![vec![]; n_labels];
-
-        for (x, y) in inputs.outer_iter().zip(targets) {
-            // Implicitly asserts that 0 <= y < self.n_labels.
-            train_inputs_vec[*y].extend(x.iter());
-        }
-
-        let d = inputs.cols();
-
-        // Convert into arrays.
-        let mut train_inputs = vec![];
-        for inputs_y in train_inputs_vec {
-            let n = inputs_y.len() / d;
-            train_inputs.push(Array::from_shape_vec((n, d), inputs_y)
-                                    .expect("Unexpected error in reshaping"));
-        }
-
-        self.train_inputs = Some(train_inputs);
+        self.train_inputs = Some(split_inputs(inputs, targets, n_labels));
 
         Ok(())
     }
+    /// Calibrates a k-NN nonconformity scorer for an ICP.
+    ///
+    /// # Arguments
+    ///
+    /// * `inputs` - Matrix (Array2<T>) with values of type T of training
+    ///              vectors.
+    /// * `targets` - Vector (Array1<T>) of labels corresponding to the
+    ///               training vectors.
+    /// * `n_labels` - Number of unique labels in the classification problem.
+    fn calibrate(&mut self, inputs: &ArrayView2<T>, targets: &ArrayView1<usize>,
+             n_labels: usize) -> LearningResult<()> {
+        self.n_labels = Some(n_labels);
+        self.calibration_inputs = Some(split_inputs(inputs, targets, n_labels));
+
+        Ok(())
+    }
+
     /// Updates a k-NN nonconformity scorer with more training data.
     ///
     /// After calling `train()` once, `update()` allows to add
@@ -118,7 +153,7 @@ impl<T: Sync> NonconformityScorer<T> for KNN<T>
     fn update(&mut self, inputs: &ArrayView2<T>, targets: &ArrayView1<usize>)
         -> LearningResult<()> {
 
-        let mut train_inputs = match self.train_inputs {
+        let train_inputs = match self.train_inputs {
             Some(ref mut train_inputs) => train_inputs,
             None => panic!("Call train() once before update()"),
         };
@@ -150,80 +185,67 @@ impl<T: Sync> NonconformityScorer<T> for KNN<T>
     /// * `y` - (Candidate) label for the test object.
     fn scores(&self, x: &ArrayView1<T>, y: usize) -> Vec<f64> {
         let train_inputs = self.train_inputs.as_ref()
-                                       .expect("You should train the model first");
-
+                                            .expect("You should train the model first");
         let train_inputs_y = &train_inputs[y];
-        // Temporarily add test_x to training inputs with label y.
-        // XXX: once ndarray supports appending a row, we should
-        // append to the matrix rather than creating a new one.
-        let train_inputs_tmp = stack![Axis(0), x.into_shape((1, train_inputs_y.cols()))
-                                                .expect("Unexpected error in reshaping"),
-                                      train_inputs_y.clone()];
+        let mut scores;
 
-        let mut scores = Vec::with_capacity(train_inputs_tmp.len());
-
-        for i in 0..train_inputs_tmp.rows() {
-            scores.push(self.score_one(i, &train_inputs_tmp.view()));
+        // ICP.
+        if let Some(calibration_inputs) = self.calibration_inputs.as_ref() {
+            //// TODO: update to new version of ndarray and rejoyce.
+            let test_inputs = stack![Axis(0), x.into_shape((1, train_inputs_y.cols()))
+                                               .expect("Unexpected error in reshaping"),
+                                     calibration_inputs[y].clone()];
+            scores = Vec::with_capacity(test_inputs.len());
+            let k = min(self.k, train_inputs_y.rows());
+            for input in test_inputs.outer_iter() {
+                // TODO: maybe just use lazy sort package?
+                let mut heap = BinaryHeap::from_iter(train_inputs_y.outer_iter()
+                                                           // Compute distances.
+                                                           .map(|x|
+                                                                (self.distance)(&x, &input))
+                                                           // we're using a max heap.
+                                                           .map(|d| OrderedFloat(-d)));
+                let mut score = 0.;
+                for _ in 0..k {
+                    score -= heap.pop()
+                               .expect("Unexpected error in computing k-NN")
+                               .into_inner();
+                }
+                scores.push(score);
+            }
         }
+        // TCP.
+        else {
+            // Temporarily add test_x to training inputs with label y.
+            // XXX: once ndarray supports appending a row, we should
+            // append to the matrix rather than creating a new one.
+            let test_inputs = stack![Axis(0), x.into_shape((1, train_inputs_y.cols()))
+                                               .expect("Unexpected error in reshaping"),
+                                     train_inputs_y.clone()];
+            scores = Vec::with_capacity(test_inputs.len());
+            let k = min(self.k, test_inputs.rows()-1);
+            for i in 0..test_inputs.rows() {
+                let input = test_inputs.row(i);
 
-        scores
-    }
-    /// Scores the `i`-th input vector given the remaining
-    /// ones with the k-NN nonconformity measure.
-    ///
-    /// # Arguments
-    ///
-    /// `i` - Input to score.
-    /// `inputs` - View on matrix `ArrayView2<2>` containing all examples.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// #[macro_use(array)]
-    /// extern crate ndarray;
-    /// extern crate random_world;
-    ///
-    /// # fn main() {
-    /// use random_world::ncm::*;
-    ///
-    /// let ncm = KNN::new(2);
-    ///
-    /// let train_inputs = array![[0., 0.],
-    ///                           [1., 0.],
-    ///                           [0., 1.],
-    ///                           [2., 2.]];
-    /// println!("{}", ncm.score_one(0, &train_inputs.view()));
-    ///
-    /// assert!(ncm.score_one(0, &train_inputs.view()) == 2.);
-    /// # }
-    /// ```
-    fn score_one(&self, i: usize, inputs: &ArrayView2<T>) -> f64 {
-        let k = min(self.k, inputs.len()-1);
-
-        let input = inputs.row(i);
-
-        let mut heap = BinaryHeap::from_iter(inputs.outer_iter()
-                                                   .enumerate()
-                                                   .filter(|&(j, _)| j != i)
-                                                   // Compute distances.
-                                                   .map(|(_, x)|
-                                                        (self.distance)(&x, &input))
-                                                   // Need Ord floats to sort.
-                                                   // NOTE: we take the negative
-                                                   // value because we're using
-                                                   // a max heap.
-                                                   .map(|d| OrderedFloat(-d)));
-        let mut sum = 0.;
-
-        for _ in 0..k {
-            if let Some(d) = heap.pop() {
-                sum -= d.into_inner();
-            } else {
-                break;
+                let mut heap = BinaryHeap::from_iter(test_inputs.outer_iter()
+                                                                 .enumerate()
+                                                                 .filter(|&(j, _)| j != i)
+                                                                 // Compute distances.
+                                                                 .map(|(_, x)|
+                                                                      (self.distance)(&x, &input))
+                                                           // we're using a max heap.
+                                                           .map(|d| OrderedFloat(-d)));
+                let mut score = 0.;
+                for _ in 0..k {
+                    score -= heap.pop()
+                               .expect("Unexpected error in computing k-NN")
+                               .into_inner();
+                }
+                scores.push(score);
             }
         }
 
-        sum
+        scores
     }
 }
 
