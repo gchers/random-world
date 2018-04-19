@@ -68,6 +68,7 @@ extern crate ndarray;
 extern crate csv;
 extern crate statrs;
 extern crate quadrature;
+extern crate lazysort;
 #[macro_use]
 extern crate approx;
 

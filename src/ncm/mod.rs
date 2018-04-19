@@ -37,8 +37,8 @@ pub trait NonconformityScorer<T: Sync> {
     ///              vectors.
     /// * `targets` - Vector (Array1<T>) of labels corresponding to the
     ///               training vectors.
-    fn calibrate(&mut self, inputs: &ArrayView2<T>, targets: &ArrayView1<usize>,
-             n_labels: usize) -> LearningResult<()>;
+    fn calibrate(&mut self, inputs: &ArrayView2<T>, targets: &ArrayView1<usize>)
+             -> LearningResult<()>;
     /// Updates a `NonconformityScorer` with more training data.
     ///
     /// After calling `train()` once, `update()` allows to add

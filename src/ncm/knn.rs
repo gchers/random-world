@@ -1,10 +1,8 @@
 //! k-NN nonconformity measure.
 use std::f64;
 use std::cmp::min;
+use lazysort::SortedPartial;
 use ndarray::prelude::*;
-use std::collections::BinaryHeap;
-use std::iter::FromIterator;
-use ordered_float::OrderedFloat;
 use rusty_machine::learning::LearningResult;
 
 use ncm::NonconformityScorer;
@@ -114,7 +112,7 @@ impl<T: Sync> NonconformityScorer<T> for KNN<T>
     fn train(&mut self, inputs: &ArrayView2<T>, targets: &ArrayView1<usize>,
              n_labels: usize) -> LearningResult<()> {
         if self.train_inputs.is_some() {
-            //Fail
+            panic!("Can only train once");
         }
         self.n_labels = Some(n_labels);
         self.train_inputs = Some(split_inputs(inputs, targets, n_labels));
@@ -130,10 +128,13 @@ impl<T: Sync> NonconformityScorer<T> for KNN<T>
     /// * `targets` - Vector (Array1<T>) of labels corresponding to the
     ///               training vectors.
     /// * `n_labels` - Number of unique labels in the classification problem.
-    fn calibrate(&mut self, inputs: &ArrayView2<T>, targets: &ArrayView1<usize>,
-             n_labels: usize) -> LearningResult<()> {
-        self.n_labels = Some(n_labels);
-        self.calibration_inputs = Some(split_inputs(inputs, targets, n_labels));
+    fn calibrate(&mut self, inputs: &ArrayView2<T>, targets: &ArrayView1<usize>)
+             -> LearningResult<()> {
+        if self.train_inputs.is_none() {
+            panic!("Need to train before calibrate()-ing");
+        }
+        self.calibration_inputs = Some(split_inputs(inputs, targets,
+                                                    self.n_labels.unwrap()));
 
         Ok(())
     }
@@ -198,25 +199,16 @@ impl<T: Sync> NonconformityScorer<T> for KNN<T>
             scores = Vec::with_capacity(test_inputs.len());
             let k = min(self.k, train_inputs_y.rows());
             for input in test_inputs.outer_iter() {
-                // TODO: maybe just use lazy sort package?
-                let mut heap = BinaryHeap::from_iter(train_inputs_y.outer_iter()
-                                                           // Compute distances.
-                                                           .map(|x|
-                                                                (self.distance)(&x, &input))
-                                                           // we're using a max heap.
-                                                           .map(|d| OrderedFloat(-d)));
-                let mut score = 0.;
-                for _ in 0..k {
-                    score -= heap.pop()
-                               .expect("Unexpected error in computing k-NN")
-                               .into_inner();
-                }
+                let score = train_inputs_y.outer_iter()
+                                          .map(|x| (self.distance)(&x, &input))
+                                          .sorted_partial_last()
+                                          .take(k)
+                                          .sum::<f64>();
                 scores.push(score);
             }
         }
         // TCP.
         else {
-            // Temporarily add test_x to training inputs with label y.
             // XXX: once ndarray supports appending a row, we should
             // append to the matrix rather than creating a new one.
             let test_inputs = stack![Axis(0), x.into_shape((1, train_inputs_y.cols()))
@@ -226,21 +218,13 @@ impl<T: Sync> NonconformityScorer<T> for KNN<T>
             let k = min(self.k, test_inputs.rows()-1);
             for i in 0..test_inputs.rows() {
                 let input = test_inputs.row(i);
-
-                let mut heap = BinaryHeap::from_iter(test_inputs.outer_iter()
-                                                                 .enumerate()
-                                                                 .filter(|&(j, _)| j != i)
-                                                                 // Compute distances.
-                                                                 .map(|(_, x)|
-                                                                      (self.distance)(&x, &input))
-                                                           // we're using a max heap.
-                                                           .map(|d| OrderedFloat(-d)));
-                let mut score = 0.;
-                for _ in 0..k {
-                    score -= heap.pop()
-                               .expect("Unexpected error in computing k-NN")
-                               .into_inner();
-                }
+                let score = test_inputs.outer_iter()
+                                       .enumerate()
+                                       .filter(|&(j, _)| j != i)
+                                       .map(|(_, x)| (self.distance)(&x, &input))
+                                       .sorted_partial_last()
+                                       .take(k)
+                                       .sum::<f64>();
                 scores.push(score);
             }
         }
