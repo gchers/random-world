@@ -119,7 +119,10 @@ Options:
 ```
 
 
-## Install
+# Library
+
+To exploit all the functionalities, or to integrate it into your project,
+you may want to use the actual library.
 
 Include the following in _Cargo.toml_:
 
@@ -172,7 +175,7 @@ assert!(preds == array![[false, true],
 Please, read the [docs](https://docs.rs/random-world/0.1.0/random_world/) for
 more examples.
 
-## Features
+# Features
 
 Methods:
 - [x] Deterministic and smoothed Conformal Predictors (aka, transductive CP)
@@ -192,11 +195,11 @@ Binaries:
 Bindings:
 - [ ] Python bindings
 
-## Authors
+# Authors
 
 * Giovanni Cherubin ([giocher.com](https://giocher.com))
 
-## Similar Projects
+# Similar Projects
 
 - [nonconformist](https://github.com/donlnz/nonconformist/) is a well
   maintained Python implementation of CP and ICP.
