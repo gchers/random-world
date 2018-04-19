@@ -52,6 +52,8 @@ pub trait ConfidencePredictor<T> {
     ///
     /// Please, see [CP](/cp/cp/struct.CP.html).
     fn update(&mut self, inputs: &ArrayView2<T>, targets: &ArrayView1<usize>) -> LearningResult<()>;
+    /// Calibrates an Inductive CP.
+    fn calibrate(&mut self, inputs: &ArrayView2<T>, targets: &ArrayView1<usize>) -> LearningResult<()>;
     /// Returns candidate labels (region prediction) for test vectors.
     ///
     /// The return value is a matrix of `bool` (`Array2<bool>`) with shape

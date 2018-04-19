@@ -29,6 +29,8 @@ pub struct CP<T: Sync, N: NonconformityScorer<T>> {
     smooth: bool,
     rng: Option<Pcg32>,
     n_labels: usize,
+    // If calibrated is Some, this is an ICP, otherwise a TCP.
+    calibrated: Option<bool>,
     // TODO: remove the following
     marker: PhantomData<T>,
 }
@@ -67,6 +69,7 @@ impl<T: Sync, N: NonconformityScorer<T>> CP<T, N> {
             smooth: false,
             n_labels: n_labels,
             rng: None,
+            calibrated: None,
             marker: PhantomData,
         }
     }
@@ -110,9 +113,49 @@ impl<T: Sync, N: NonconformityScorer<T>> CP<T, N> {
                 Some(seed) => Some(Pcg32::from_seed(seed)),
                 None => Some(Pcg32::new_unseeded())
             },
+            calibrated: None,
             marker: PhantomData,
         }
     }
+
+    /// Constructs a new deterministic Inductive Conformal Predictor
+    /// `CP<T,N>` from a nonconformity score NonconformityScorer.
+    ///
+    /// # Arguments
+    ///
+    /// * `ncm` - An object implementing NonconformityScorer.
+    /// * `n_labels` - The number of labels.
+    /// * `epsilon` - Either Some() significance level in [0,1] or None.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use random_world::cp::*;
+    /// use random_world::ncm::*;
+    ///
+    /// let ncm = KNN::new(2);
+    /// let n_labels = 2;
+    /// let epsilon = 0.1;
+    /// let mut cp = CP::new_inductive(ncm, n_labels, Some(epsilon));
+    /// ```
+    pub fn new_inductive(ncm: N, n_labels: usize, epsilon: Option<f64>) -> CP<T, N> {
+        assert!(n_labels > 0);
+
+        if let Some(e) = epsilon {
+            assert!(e >= 0. && e <= 1.);
+        }
+
+        CP {
+            ncm: ncm,
+            epsilon: epsilon,
+            smooth: false,
+            n_labels: n_labels,
+            rng: None,
+            calibrated: Some(false),
+            marker: PhantomData,
+        }
+    }
+
 }
 
 impl<T, N> ConfidencePredictor<T> for CP<T, N>
@@ -182,9 +225,6 @@ impl<T, N> ConfidencePredictor<T> for CP<T, N>
              -> LearningResult<()> {
 
         assert!(inputs.rows() == targets.len());
-        //if self.train_inputs.is_some() {
-        //    panic!("Can only train() once. Use update() to update training data");
-        //}
 
         self.ncm.train(inputs, targets, self.n_labels)
     }
@@ -282,6 +322,17 @@ impl<T, N> ConfidencePredictor<T> for CP<T, N>
         assert!(inputs.rows() == targets.len());
 
         self.ncm.update(inputs, targets)
+    }
+
+    fn calibrate(&mut self, inputs: &ArrayView2<T>, targets: &ArrayView1<usize>)
+            -> LearningResult<()> {
+
+        if self.calibrated.is_none() {
+            panic!("Can only call calibrate() for an inductive CP");
+        }
+        assert!(inputs.rows() == targets.len());
+
+        self.ncm.calibrate(inputs, targets)
     }
 
     /// Returns candidate labels (region prediction) for test vectors.
@@ -384,6 +435,13 @@ impl<T, N> ConfidencePredictor<T> for CP<T, N>
     /// }
     /// ```
     fn predict_confidence(&mut self, inputs: &ArrayView2<T>) -> LearningResult<Array2<f64>> {
+        // ICP needs to be calibrated.
+        if let Some(calibrated) = self.calibrated {
+            if !calibrated {
+                panic!("Need to calibrate() an ICP before calling predict()");
+            }
+        }
+
         // Init pvalues with NaN to ease future debugging.
         let mut pvalues = Array2::<f64>::from_elem((inputs.rows(), self.n_labels), NAN);
 
