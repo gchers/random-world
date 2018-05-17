@@ -97,8 +97,8 @@ fn main() {
         let (test_inputs, _) = load_data(&testing_file)
                                     .expect("Failed to load data");
         // Train on half, calibrate on the other half.
-        let n_train = train_inputs.rows() / 2;
-        let n_train = 10;
+        let n_train = (train_inputs.rows() / 2) as isize;
+
         cp.train(&train_inputs.slice(s![..n_train, ..]),
                  &train_targets.slice(s![..n_train]))
           .expect("Failed to train the model");
