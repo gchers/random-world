@@ -332,6 +332,8 @@ impl<T, N> ConfidencePredictor<T> for CP<T, N>
         }
         assert!(inputs.rows() == targets.len());
 
+        self.calibrated = Some(true);
+
         self.ncm.calibrate(inputs, targets)
     }
 
