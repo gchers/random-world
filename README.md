@@ -22,17 +22,18 @@ Standalone binaries are meant to cover most functionalities of the library.
 They operate on `.csv` files, and allow to make CP predictions, test exchangeability,
 and much more.
 
-## Install
+## Installation
 
 To install the binaries, install Rust's package manager
 [cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html).
-Then run from your shell:
+Then run:
 
 ```
 cargo install random-world
 ```
 
-This will install on your system the binaries: `cp-predict` and `martingales`.
+This will install on your system the binaries: `cp-predict`, `icp-predict`,
+and `martingales`.
 
 ## cp-predict
 
@@ -96,6 +97,13 @@ Options:
     -h, --help                  Show help.
     --version                   Show the version.
 ```
+
+## icp-predict
+
+The syntax for `icp-predict` is currently identical to that of `cp-predict`:
+the size of the calibration set is chosen to be half the size of the training
+set.
+This will change (hopefully soon).
 
 ## martingales
 
@@ -179,7 +187,7 @@ more examples.
 
 Methods:
 - [x] Deterministic and smoothed Conformal Predictors (aka, transductive CP)
-- [ ] Deterministic and smoothed Inductive Conformal Predictors (ICP)
+- [x] Deterministic Inductive Conformal Predictors (ICP)
 - [x] Plug-in and Power martingales for exchangeability testing
 - [ ] Venn Predictors
 
@@ -191,6 +199,7 @@ Nonconformity measures:
 Binaries:
 - [x] CP (both batch prediction and on-line)
 - [x] Martingales
+- [x] Inductive CP (batch prediction only)
 
 Bindings:
 - [ ] Python bindings
