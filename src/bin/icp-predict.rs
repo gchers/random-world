@@ -85,6 +85,8 @@ fn main() {
             Some(s) => Some([0, s]),
             None => None,
         };
+        // Not sure why we'd need smooth ICP, as it's mostly of theoretical
+        // interest (and implemented for transductive CP in cp-predict).
         unimplemented!();
     } else {
         CP::new_inductive(ncm, n_labels, args.flag_epsilon)
@@ -120,33 +122,8 @@ fn main() {
                 .expect("Failed to store the output");
         }
     } else {
+        // On-line version of ICP is not implemented. It's not clear to
+        // me whether it'd be useful at all.
         unimplemented!();
-
-        println!("Using CP in on-line mode on training data");
-
-        // Train on first data point.
-        let x = train_inputs.slice(s![0..1, ..]);
-        let y = train_targets[[0]];
-        cp.train(&x, &array![y].view())
-          .expect("Failed to train CP");
-
-        // Reset output file.
-        store_predictions(Array2::<f64>::zeros((0,0)).view(),
-                          &args.arg_output_file, false).expect("Failed to initialize file");
-
-        // Update and predict the remaining points in on-line mode.
-        for (x, y) in train_inputs.outer_iter().zip(train_targets.view()).skip(1) {
-            let x_ = x.into_shape((1, x.len())).unwrap();
-            let y_ = array![*y];
-            let preds = cp.predict_confidence(&x_)
-                          .expect("Failed to predict");
-
-            cp.update(&x_, &y_.view())
-              .expect("Failed to update CP");
-
-            // Write to file.
-            store_predictions(preds.view(), &args.arg_output_file, true)
-                .expect("Failed to store the output");
-        }
     }
 }
