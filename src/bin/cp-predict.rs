@@ -18,9 +18,9 @@ Predict data using Conformal Prediction.
 
 If no <testing-file> is specified, on-line mode is assumed.
 
-Usage: cp knn [--knn=<k>] [options] [--] <output-file> <training-file> [<testing-file>]
-       cp kde [--kernel<kernel>] [--bandwidth=<bw>] [options] [--] <output-file> <training-file> [<testing-file>]
-       cp (--help | --version)
+Usage: cp-predict knn [--knn=<k>] [options] [--] <output-file> <training-file> [<testing-file>]
+       cp-predict kde [--kernel<kernel>] [--bandwidth=<bw>] [options] [--] <output-file> <training-file> [<testing-file>]
+       cp-predict (--help | --version)
 
 Options:
     -e, --epsilon=<epsilon>     Significance level. If specified, the output are
