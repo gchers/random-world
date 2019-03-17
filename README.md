@@ -28,8 +28,8 @@ To install the binaries, install Rust's package manager
 [cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html).
 Then run:
 
-```
-cargo install random-world
+```console
+$ cargo install random-world
 ```
 
 This will install on your system the binaries: `cp-predict`, `icp-predict`,
@@ -58,7 +58,8 @@ a p-value (float in [0,1]), depending on the flags passed to `cp-predict`;
 each row contains a value for each label.
 
 Example:
-```
+
+```console
 $ cp-predict knn -k 1 predictions.csv train_data.csv test_data.csv
 ```
 Runs CP with nonconformity measure k-NN (k=1) on `train_data.csv`,
@@ -70,12 +71,14 @@ a significance level with `--epsilon`.
 To run CP in on-line mode on a dataset (i.e., predict one object
 per time and then append it to the training examples), only specify
 the training file:
-```
+
+```console
 $ cp-predict knn -k 1 predictions.csv train_data.csv
 ```
 
 More options are documented in the help:
-```
+
+```console
 $ cp-predict -h
 
 Predict data using Conformal Prediction.
@@ -111,7 +114,7 @@ Computes exchangeability martingales from a file of p-values.
 P-values should be computed using `cp-predict` in an on-line setting
 for a single label problem.
 
-```
+```console
 $ martingales -h
 
 Test exchangeability using martingales.
