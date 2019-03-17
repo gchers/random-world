@@ -210,5 +210,5 @@ Bindings:
 
 # Similar Projects
 
-- [nonconformist](https://github.com/donlnz/nonconformist/) is a well
-  maintained Python implementation of CP and ICP.
+- [nonconformist](https://github.com/donlnz/nonconformist/) is a
+  Python implementation of CP and ICP.
