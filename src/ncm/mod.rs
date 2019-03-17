@@ -29,6 +29,16 @@ pub trait NonconformityScorer<T: Sync> {
     ///               training vectors.
     fn train(&mut self, inputs: &ArrayView2<T>, targets: &ArrayView1<usize>,
              n_labels: usize) -> LearningResult<()>;
+    /// Calibrates a `NonconformityScorer` for an ICP.
+    ///
+    /// # Arguments
+    ///
+    /// * `inputs` - Matrix (Array2<T>) with values of type T of training
+    ///              vectors.
+    /// * `targets` - Vector (Array1<T>) of labels corresponding to the
+    ///               training vectors.
+    fn calibrate(&mut self, inputs: &ArrayView2<T>, targets: &ArrayView1<usize>)
+             -> LearningResult<()>;
     /// Updates a `NonconformityScorer` with more training data.
     ///
     /// After calling `train()` once, `update()` allows to add
@@ -56,16 +66,4 @@ pub trait NonconformityScorer<T: Sync> {
     /// * `x` - Test object.
     /// * `y` - (Candidate) label for the test object.
     fn scores(&self, input: &ArrayView1<T>, targets: usize) -> Vec<f64>;
-    /// Scores the `i`-th input vector given the remaining
-    /// ones with the k-NN nonconformity measure.
-    ///
-    /// NOTE: if you are `impl`-ementing this trait, this function is only
-    /// here as a helper function; you may simply leave it
-    /// `unimplemented!()` if you do not need it.
-    ///
-    /// # Arguments
-    ///
-    /// `i` - Input to score.
-    /// `inputs` - View on matrix `ArrayView2<2>` containing all examples.
-    fn score_one(&self, i: usize, inputs: &ArrayView2<T>) -> f64;
 }
