@@ -10,7 +10,7 @@ use csv::{ReaderBuilder, WriterBuilder};
 /// The file format should be, for each row:
 ///     label, x1, x2, ...
 /// where x1, x2, ... are features forming a feature vector.
-pub fn load_data(fname: &String) -> Result<(Array2<f64>, Array1<usize>), Box<Error>> {
+pub fn load_data(fname: &str) -> Result<(Array2<f64>, Array1<usize>), Box<Error>> {
     let mut reader = ReaderBuilder::new()
                                    .has_headers(false)
                                    .from_path(fname)?;
@@ -57,7 +57,7 @@ pub fn load_data(fname: &String) -> Result<(Array2<f64>, Array1<usize>), Box<Err
 /// for one test object:
 ///     x1, x2, ...
 /// where each value corresponds to a label.
-pub fn store_predictions<T>(predictions: ArrayView2<T>, fname: &String,
+pub fn store_predictions<T>(predictions: ArrayView2<T>, fname: &str,
         append: bool) -> Result<(), Box<Error>> where T: Display {
     if !append {
         // Empty the file.
@@ -85,7 +85,7 @@ pub fn store_predictions<T>(predictions: ArrayView2<T>, fname: &String,
 /// for one test object:
 ///     x1, x2, ...
 /// where each value corresponds to a label.
-pub fn load_pvalues(fname: &String) -> Result<Array2<f64>, Box<Error>> {
+pub fn load_pvalues(fname: &str) -> Result<Array2<f64>, Box<Error>> {
     let mut reader = ReaderBuilder::new()
                                    .has_headers(false)
                                    .from_path(fname)?;
