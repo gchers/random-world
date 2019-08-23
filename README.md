@@ -1,4 +1,4 @@
-# random-world [![Build Status](https://travis-ci.org/gchers/random-world.svg?branch=master)](https://travis-ci.org/gchers/random-world) ![Version](https://img.shields.io/crates/v/random-world.svg)
+# random-world [![Build Status](https://travis-ci.org/gchers/random-world.svg?branch=master)](https://travis-ci.org/gchers/random-world) ![Version](https://img.shields.io/crates/v/random-world.svg) [![DOI](https://zenodo.org/badge/110107978.svg)](https://zenodo.org/badge/latestdoi/110107978)
 
 This is a `rust` implementation of Machine Learning (ML) methods for confident
 prediction (e.g., Conformal Predictors) and related ones introduced in the book
@@ -181,7 +181,7 @@ Include the following in _Cargo.toml_:
 
 ```
 [dependencies]
-random-world = "0.2.1"
+random-world = "0.3.0"
 ```
 
 ## Quick Intro
