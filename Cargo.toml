@@ -1,7 +1,7 @@
 [package]
 name = "random-world"
 description = "Implementation of Machine Learning methods for confident prediction (e.g., Conformal Predictors) and related ones introduced in the book Algorithmic Learning in a Random World (ALRW)"
-version = "0.2.1"
+version = "0.3.0"
 license = "MIT"
 repository = "https://github.com/gchers/random-world"
 authors = ["Giovanni Cherubin <g.chers@gmail.com>"]
