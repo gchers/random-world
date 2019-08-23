@@ -129,6 +129,48 @@ Options:
     --version                   Show the version.
 ```
 
+Example:
+
+Have a look at `examples/non-iid.csv`:
+
+    0,1.77750,-0.84078
+    0,-1.68787,3.86305
+    0,-0.56455,0.17416
+    0,-0.86380,0.39916
+    ...
+
+These represent anomalous time series data, artificially generated to serve as an
+example for this very code; **do not use** it as an anomaly detection benchmark:
+it will have little use.
+Each line contains a label (always set to `0`, which is required for computing martingales in
+the next steps), and a vector. These data contains 200 examples: the first
+100 were generated according to a multivariate Normal distribution centered
+in `[0, 0]` and with covariance matrix `[[1, 0], [0, 5]]`; the last
+200 examples according to a multivariate Normal distribution with mean
+`[5, 5]` and covariance `[[5, 0], [0, 10]]`.
+Therefore, the "anomalous" section of the data begins after 100 examples.
+
+To produce the martingales:
+
+```console
+# Use CP in on-line mode
+cp-predict knn -k 1 pvalues.csv examples/non-iid.csv
+# Martingales
+martingales plugin --bandwidth=0.2 martingales.csv pvalues.csv
+```
+
+Have a look at `martingales.csv`: it should now contain the martingale
+values, one per line.
+You can call anomalous behaviour whenever the
+martingale's value is over a threshold (e.g., 20 or 100).
+Here's a plot of the martingales values for this specific example.
+
+<p align="center">
+<img src="https://raw.githubusercontent.com/gchers/random-world/master/examples/martingales.png" width="400"/>
+</p>
+
+With threshold 20, the anomaly is detected roughly 50 examples after the anomaly happens.
+
 
 # Library
 
